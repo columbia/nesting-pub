@@ -57,6 +57,12 @@ config KVM_ARM_PMU
 	  Adds support for a virtual Performance Monitoring Unit (PMU) in
 	  virtual machines.
 
+config KVM_ARM_NESTED_HYP
+	bool "Nested Virtualization"
+	depends on KVM
+	---help---
+	  Support nested hypervisors in VMs.
+
 source drivers/vhost/Kconfig
 
 endif # VIRTUALIZATION
