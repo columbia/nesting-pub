@@ -143,6 +143,18 @@ static inline bool vcpu_mode_priv(const struct kvm_vcpu *vcpu)
 	return mode != PSR_MODE_EL0t;
 }
 
+static inline bool vcpu_mode_el2(const struct kvm_vcpu *vcpu)
+{
+	u32 mode;
+
+	if (vcpu_mode_is_32bit(vcpu))
+		return false;
+
+	mode = *vcpu_cpsr(vcpu) & PSR_MODE_MASK;
+
+	return mode == PSR_MODE_EL2h || mode == PSR_MODE_EL2t;
+}
+
 static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
 {
 	return vcpu->arch.fault.esr_el2;
