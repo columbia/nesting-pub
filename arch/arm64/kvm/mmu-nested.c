@@ -55,22 +55,40 @@ static unsigned int pa_max(void)
 static int vcpu_inject_s2_trans_fault(struct kvm_vcpu *vcpu, gpa_t ipa,
 				      int level)
 {
-	/* TODO: Implement */
-	return -EFAULT;
+	u32 esr;
+
+	vcpu->arch.ctxt.el2_regs[FAR_EL2] = vcpu->arch.fault.far_el2;
+	vcpu->arch.ctxt.el2_regs[HPFAR_EL2] = vcpu->arch.fault.hpfar_el2;
+	esr = kvm_vcpu_get_hsr(vcpu) & ~ESR_ELx_FSC;
+	esr |= ESR_ELx_FSC_FAULT;
+	esr |= level & 0x3;
+	return kvm_inject_nested_sync(vcpu, esr);
 }
 
 static int vcpu_inject_s2_addr_sz_fault(struct kvm_vcpu *vcpu, gpa_t ipa,
 					int level)
 {
-	/* TODO: Implement */
-	return -EFAULT;
+	u32 esr;
+
+	vcpu->arch.ctxt.el2_regs[FAR_EL2] = vcpu->arch.fault.far_el2;
+	vcpu->arch.ctxt.el2_regs[HPFAR_EL2] = vcpu->arch.fault.hpfar_el2;
+	esr = kvm_vcpu_get_hsr(vcpu) & ~ESR_ELx_FSC;
+	esr |= ESR_ELx_FSC_ADDRSZ;
+	esr |= level & 0x3;
+	return kvm_inject_nested_sync(vcpu, esr);
 }
 
 static int vcpu_inject_s2_access_flag_fault(struct kvm_vcpu *vcpu, gpa_t ipa,
 					    int level)
 {
-	/* TODO: Implement */
-	return -EFAULT;
+	u32 esr;
+
+	vcpu->arch.ctxt.el2_regs[FAR_EL2] = vcpu->arch.fault.far_el2;
+	vcpu->arch.ctxt.el2_regs[HPFAR_EL2] = vcpu->arch.fault.hpfar_el2;
+	esr = kvm_vcpu_get_hsr(vcpu) & ~ESR_ELx_FSC;
+	esr |= ESR_ELx_FSC_ACCESS;
+	esr |= level & 0x3;
+	return kvm_inject_nested_sync(vcpu, esr);
 }
 
 static int check_base_s2_limits(struct kvm_vcpu *vcpu, struct s2_walk_info *wi,
