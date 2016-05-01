@@ -309,4 +309,11 @@ static inline struct kvm_s2_vmid *vcpu_get_active_vmid(struct kvm_vcpu *vcpu)
 {
 	return &vcpu->kvm->arch.mmu.vmid;
 }
+
+/* arm architecture doesn't support the nesting */
+static inline bool kvm_is_shadow_s2_fault(struct kvm_vcpu *vcpu)
+{
+	return false;
+}
+
 #endif /* __ARM_KVM_EMULATE_H__ */
