@@ -325,6 +325,9 @@ static inline unsigned int kvm_get_vmid_bits(void)
 struct kvm_s2_trans {
 	phys_addr_t output;
 	phys_addr_t block_size;
+	bool writable;
+	bool readable;
+	int level;
 };
 
 struct kvm_nested_s2_mmu *get_nested_mmu(struct kvm_vcpu *vcpu, u64 vttbr);
