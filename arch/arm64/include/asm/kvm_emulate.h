@@ -390,4 +390,9 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
 	return data;		/* Leave LE untouched */
 }
 
+static inline bool kvm_is_shadow_s2_fault(struct kvm_vcpu *vcpu)
+{
+	return vcpu_nested_stage2_enabled(vcpu) && !is_hyp_ctxt(vcpu);
+}
+
 #endif /* __ARM64_KVM_EMULATE_H__ */

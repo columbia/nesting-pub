@@ -60,6 +60,14 @@ static int esr_s2_fault(struct kvm_vcpu *vcpu, int level, u32 fsc)
 	return esr;
 }
 
+int kvm_inject_s2_fault(struct kvm_vcpu *vcpu, u64 esr_el2)
+{
+	vcpu->arch.ctxt.sys_regs[FAR_EL2] = vcpu->arch.fault.far_el2;
+	vcpu->arch.ctxt.sys_regs[HPFAR_EL2] = vcpu->arch.fault.hpfar_el2;
+
+	return kvm_inject_nested_sync(vcpu, esr_el2);
+}
+
 static int check_base_s2_limits(struct kvm_vcpu *vcpu, struct s2_walk_info *wi,
 				int level, int input_size, int stride)
 {
