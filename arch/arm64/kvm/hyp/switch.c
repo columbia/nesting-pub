@@ -91,6 +91,9 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
 	if (val & HCR_RW) /* for AArch64 only: */
 		val |= HCR_TID3; /* TID3: trap feature register accesses */
 
+	if (vcpu_mode_el2(vcpu))
+		val |= HCR_TVM | HCR_TRVM;
+
 	write_sysreg(val, hcr_el2);
 
 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
