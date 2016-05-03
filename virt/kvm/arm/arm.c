@@ -363,6 +363,14 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 		u64 vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
 
 		kvm_call_hyp(__kvm_tlb_flush_local_vmid, vttbr);
+
+		/* TODO: There should be no !. Fix it later once the porting is done. */
+		if (!nested_virt_in_use(vcpu)) {
+			if (mmu->el2_vmid.vmid) {
+				vttbr = kvm_get_vttbr(&mmu->el2_vmid, mmu);
+				kvm_call_hyp(__kvm_tlb_flush_local_vmid, vttbr);
+			}
+		}
 		*last_ran = vcpu->vcpu_id;
 	}
 
