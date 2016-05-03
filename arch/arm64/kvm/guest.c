@@ -117,6 +117,8 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 		case PSR_MODE_EL0t:
 		case PSR_MODE_EL1t:
 		case PSR_MODE_EL1h:
+		case PSR_MODE_EL2h:
+		case PSR_MODE_EL2t:
 			break;
 		default:
 			err = -EINVAL;
