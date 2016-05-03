@@ -64,13 +64,34 @@ void kvm_flush_remote_tlbs(struct kvm *kvm)
 	struct kvm_s2_mmu *mmu = &kvm->arch.mmu;
 	u64 vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
 
-	kvm_call_hyp(__kvm_tlb_flush_vmid, vttbr);
+	if (!mmu->el2_vmid.vmid) {
+		/*
+		 * For a normal (i.e. non-nested) guest, flush entries for the
+		 * given VMID *
+		 */
+		kvm_call_hyp(__kvm_tlb_flush_vmid, vttbr);
+	} else {
+		/*
+		 * When supporting nested virtualization, we can have multiple
+		 * VMIDs in play for each VCPU in the VM, so it's really not
+		 * worth it to try to quiesce the system and flush all the
+		 * VMIDs that may be in use, instead just nuke the whole thing.
+		 */
+		kvm_call_hyp(__kvm_flush_vm_context);
+	}
 }
 
 static void kvm_tlb_flush_vmid_ipa(struct kvm_s2_mmu *mmu, phys_addr_t ipa)
 {
 	u64 vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
 
+	kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, vttbr, ipa);
+
+	if (!mmu->el2_vmid.vmid) {
+		/* Nothing to do more for a non-nested guest */
+		return;
+	}
+	vttbr = kvm_get_vttbr(&mmu->el2_vmid, mmu);
 	kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, vttbr, ipa);
 }
 
