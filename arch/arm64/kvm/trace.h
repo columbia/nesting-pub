@@ -169,6 +169,32 @@ TRACE_EVENT(kvm_set_guest_debug,
 	TP_printk("vcpu: %p, flags: 0x%08x", __entry->vcpu, __entry->guest_debug)
 );
 
+TRACE_EVENT(kvm_nested_msr_pv,
+	TP_PROTO(struct kvm_vcpu *vcpu, int sysreg, u64 val, int reg, int is_el2),
+	TP_ARGS(vcpu, sysreg, val, reg, is_el2),
+
+	TP_STRUCT__entry(
+		__field(struct kvm_vcpu *,	vcpu)
+		__field(int,			sysreg)
+		__field(u64,			val)
+		__field(int,			reg)
+		__field(int,			is_el2)
+	),
+
+	TP_fast_assign(
+		__entry->vcpu = vcpu;
+		__entry->sysreg = sysreg;
+		__entry->val = val;
+		__entry->reg = reg;
+		__entry->is_el2 = is_el2;
+	),
+
+	TP_printk("vcpu: %p, sysreg: %d, val: 0x%lx (reg: %d) (is_el2: %d)",
+		  __entry->vcpu, __entry->sysreg,
+		  (unsigned long)__entry->val,
+		  __entry->reg, __entry->is_el2)
+);
+
 
 TRACE_EVENT(kvm_inject_nested_exception,
 	TP_PROTO(struct kvm_vcpu *vcpu, unsigned long esr_el2,
