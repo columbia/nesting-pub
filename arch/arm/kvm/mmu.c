@@ -422,6 +422,35 @@ static void stage2_flush_vm(struct kvm *kvm)
 	srcu_read_unlock(&kvm->srcu, idx);
 }
 
+/**
+ * Same as above but only flushed shadow state for specific vcpu
+ */
+static void stage2_flush_vcpu(struct kvm_vcpu *vcpu)
+{
+	struct kvm *kvm = vcpu->kvm;
+	struct kvm_memslots *slots;
+	struct kvm_memory_slot *memslot;
+	int idx;
+	struct kvm_nested_s2_mmu __maybe_unused *nested_mmu;
+
+	idx = srcu_read_lock(&kvm->srcu);
+	spin_lock(&kvm->mmu_lock);
+
+	slots = kvm_memslots(kvm);
+	kvm_for_each_memslot(memslot, slots)
+		stage2_flush_memslot(&kvm->arch.mmu, memslot);
+
+#ifdef CONFIG_KVM_ARM_NESTED_HYP
+	list_for_each_entry_rcu(nested_mmu, &vcpu->kvm->arch.nested_mmu_list,
+				list) {
+		kvm_stage2_flush_range(&nested_mmu->mmu, 0, KVM_PHYS_SIZE);
+	}
+#endif
+
+	spin_unlock(&kvm->mmu_lock);
+	srcu_read_unlock(&kvm->srcu, idx);
+}
+
 static void clear_hyp_pgd_entry(pgd_t *pgd)
 {
 	pud_t *pud_table __maybe_unused = pud_offset(pgd, 0UL);
@@ -2074,7 +2103,7 @@ void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled)
 	 * Clean + invalidate does the trick always.
 	 */
 	if (now_enabled != was_enabled)
-		stage2_flush_vm(vcpu->kvm);
+		stage2_flush_vcpu(vcpu);
 
 	/* Caches are now on, stop trapping VM ops (until a S/W op) */
 	if (now_enabled)
