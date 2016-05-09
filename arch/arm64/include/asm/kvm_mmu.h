@@ -354,6 +354,8 @@ int kvm_inject_s2_fault(struct kvm_vcpu *vcpu, u64 esr_el2);
 bool kvm_nested_s2_clear_curr_vmid(struct kvm_vcpu *vcpu, phys_addr_t start,
 				   u64 size);
 struct kvm_nested_s2_mmu *lookup_nested_mmu(struct kvm_vcpu *vcpu, u64 vttbr);
+int kvm_nested_mmio_ondemand(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+			     phys_addr_t ipa);
 
 static inline u64 kvm_get_vttbr(struct kvm_s2_vmid *vmid,
 				struct kvm_s2_mmu *mmu)
