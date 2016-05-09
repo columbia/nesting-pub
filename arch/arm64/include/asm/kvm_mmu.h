@@ -354,6 +354,8 @@ void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu);
 void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm);
 void kvm_nested_s2_all_vcpus_unmap(struct kvm *kvm);
 void kvm_nested_s2_all_vcpus_flush(struct kvm *kvm);
+int kvm_nested_mmio_ondemand(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+			     phys_addr_t ipa);
 #else
 static inline struct kvm_nested_s2_mmu *get_nested_mmu(struct kvm_vcpu *vcpu,
 						       u64 vttbr)
@@ -389,6 +391,9 @@ static inline void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu) { }
 static inline void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm) { }
 static inline void kvm_nested_s2_all_vcpus_unmap(struct kvm *kvm) { }
 static inline void kvm_nested_s2_all_vcpus_flush(struct kvm *kvm) { }
+static inline int kvm_nested_mmio_ondemand(struct kvm_vcpu *vcpu,
+					   phys_addr_t fault_ipa,
+					   phys_addr_t ipa) { return 0; }
 #endif
 
 static inline u64 kvm_get_vttbr(struct kvm_s2_vmid *vmid,

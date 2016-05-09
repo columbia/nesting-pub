@@ -1615,6 +1615,11 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
 			goto out_unlock;
 		}
 
+		if (kvm_nested_mmio_ondemand(vcpu, fault_ipa, ipa)) {
+			ret = 1;
+			goto out_unlock;
+		}
+
 		/*
 		 * The IPA is reported as [MAX:12], so we need to
 		 * complement it with the bottom 12 bits from the

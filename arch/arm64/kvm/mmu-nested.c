@@ -473,3 +473,29 @@ bool handle_vttbr_update(struct kvm_vcpu *vcpu, u64 vttbr)
 
 	return true;
 }
+
+/*
+ * vcpu interface address. This address is supposed to come from the guest's
+ * device tree via QEMU. Here we just hardcoded it, but should be fixed.
+ */
+#define NESTED_VCPU_IF_ADDR	0x08010000
+int kvm_nested_mmio_ondemand(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+			     phys_addr_t ipa)
+{
+	int ret = 0;
+	phys_addr_t vcpu_base = vgic_vcpu_base();
+
+	/* Return if this fault is not from a nested VM */
+	if (vcpu->arch.hw_mmu == &vcpu->kvm->arch.mmu)
+		return ret;
+
+	if (ipa == NESTED_VCPU_IF_ADDR)  {
+		ret = __kvm_phys_addr_ioremap(vcpu->kvm, vcpu->arch.hw_mmu,
+					      fault_ipa, vcpu_base,
+					      KVM_VGIC_V2_CPU_SIZE, true);
+		if (!ret)
+			ret = 1;
+	}
+
+	return ret;
+}
