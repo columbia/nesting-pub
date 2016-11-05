@@ -64,6 +64,12 @@ config KVM_ARM_PMU
 	  Adds support for a virtual Performance Monitoring Unit (PMU) in
 	  virtual machines.
 
+config KVM_UNIT_TEST
+	bool "Running kvm-unit-test"
+	default n
+	---help---
+	  Allows to get cycle counts etc from kvm-unit-test
+
 source drivers/vhost/Kconfig
 
 endif # VIRTUALIZATION

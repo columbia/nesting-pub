@@ -537,6 +537,34 @@ static void update_vttbr(struct kvm *kvm, struct kvm_s2_vmid *vmid)
 	spin_unlock(&kvm_vmid_lock);
 }
 
+#ifdef CONFIG_KVM_UNIT_TEST
+/* This is only for micro benchmark measurement */
+static void enable_cc(void *dummy)
+{
+	unsigned long tmp;
+	asm volatile(
+		     "mrs %0, PMCR_EL0\n"
+		     "orr %0, %0, #1\n"
+		     "orr %0, %0, #(1 << 2)\n"
+		     "bic %0, %0, #(1 << 3)\n"
+		     "msr PMCR_EL0, %0\n"
+		     "mov %0, #0b11111\n"
+		     "msr PMSELR_EL0, %0\n"
+		     "isb \n"
+		     "mrs %0, PMXEVTYPER_EL0\n"
+		     "orr %0, %0, #(1 << 27)\n"
+		     "bic %0, %0, #(3 << 30)\n"
+		     "bic %0, %0, #(3 << 28)\n"
+		     "msr PMXEVTYPER_EL0, %0\n"
+		     "mrs %0, PMCNTENSET_EL0\n"
+		     "orr %0, %0, #(1 << 31)\n"
+		     "msr PMCNTENSET_EL0, %0\n"
+		     : "=r" (tmp));
+	isb();
+	return;
+}
+#endif
+
 static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
 {
 	struct kvm *kvm = vcpu->kvm;
@@ -545,6 +573,10 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
 	if (likely(vcpu->arch.has_run_once))
 		return 0;
 
+#ifdef CONFIG_KVM_UNIT_TEST
+	/* This is only for micro benchmark measurement */
+	on_each_cpu(enable_cc, NULL, 1);
+#endif
 	vcpu->arch.has_run_once = true;
 
 	/*
