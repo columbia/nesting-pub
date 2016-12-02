@@ -22,10 +22,15 @@
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_hyp.h>
 
+static __hyp_text struct vgic_v2_cpu_if *__hyp_get_cpu_if(struct kvm_vcpu *vcpu)
+{
+	return kern_hyp_va(vcpu->arch.vgic_cpu.hw_v2_cpu_if);
+}
+
 static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
 					    void __iomem *base)
 {
-	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
 	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
 	u32 eisr0, eisr1;
 	int i;
@@ -67,7 +72,7 @@ static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
 
 static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
 {
-	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
 	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
 	u32 elrsr0, elrsr1;
 
@@ -86,7 +91,7 @@ static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
 
 static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
 {
-	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
 	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
 	int i;
 
@@ -107,7 +112,7 @@ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
 void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
 {
 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
-	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
 	struct vgic_dist *vgic = &kvm->arch.vgic;
 	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
 
@@ -138,7 +143,7 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
 void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
 {
 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
-	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
 	struct vgic_dist *vgic = &kvm->arch.vgic;
 	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
 	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
