@@ -386,3 +386,9 @@ out:
 
 	return ret;
 }
+
+/* Return physical address of vgic virtual cpu interface */
+phys_addr_t vgic_vcpu_base(void)
+{
+	return kvm_vgic_global_state.vcpu_base;
+}
