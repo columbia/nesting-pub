@@ -173,6 +173,12 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
 		ctxt->hw_pstate = *vcpu_cpsr(vcpu);
 		ctxt->hw_sys_regs = ctxt->sys_regs;
 		ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
+
+		/*
+		 * A non-secure EL0 or EL1 read of MPIDR_EL1 returns
+		 * the value of VMPIDR_EL2.
+		 */
+		ctxt->hw_sys_regs[MPIDR_EL1] = ctxt->el2_regs[VMPIDR_EL2];
 	}
 
 	vgic_v2_setup_shadow_state(vcpu);
