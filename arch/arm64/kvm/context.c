@@ -323,6 +323,8 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
 
+	vgic_handle_nested_maint_irq(vcpu);
+
 	if (unlikely(is_hyp_ctxt(vcpu))) {
 		flush_shadow_special_regs(vcpu);
 		flush_shadow_el1_sysregs(vcpu);
