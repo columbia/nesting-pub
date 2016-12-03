@@ -15,6 +15,10 @@
 #include "vgic.h"
 #include "vgic-mmio.h"
 
+/* FIXME: This should come from DT */
+#define KVM_VGIC_V2_GICH_BASE          0x08030000
+#define KVM_VGIC_V2_GICH_SIZE          0x2000
+
 static inline struct vgic_v2_cpu_if *vcpu_nested_if(struct kvm_vcpu *vcpu)
 {
 	return &vcpu->arch.vgic_cpu.nested_vgic_v2;
@@ -205,6 +209,33 @@ static const struct vgic_register_region vgic_v2_gich_registers[] = {
 		vgic_mmio_read_v2_gich, vgic_mmio_write_v2_gich,
 		4 * VGIC_V2_MAX_LRS, VGIC_ACCESS_32bit),
 };
+
+int vgic_register_gich_iodev(struct kvm *kvm, struct vgic_dist *dist)
+{
+	struct vgic_io_device *io_device = &kvm->arch.vgic.hyp_iodev;
+	int ret = 0;
+	unsigned int len;
+
+	if (!nested_virt_in_use(kvm->vcpus[0]))
+		return 0;
+
+	len = KVM_VGIC_V2_GICH_SIZE;
+
+	io_device->regions = vgic_v2_gich_registers;
+	io_device->nr_regions = ARRAY_SIZE(vgic_v2_gich_registers);
+	kvm_iodevice_init(&io_device->dev, &kvm_io_gic_ops);
+
+	io_device->base_addr = KVM_VGIC_V2_GICH_BASE;
+	io_device->iodev_type = IODEV_GICH;
+	io_device->redist_vcpu = NULL;
+
+	mutex_lock(&kvm->slots_lock);
+	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, KVM_VGIC_V2_GICH_BASE,
+			len, &io_device->dev);
+	mutex_unlock(&kvm->slots_lock);
+
+	return ret;
+}
 
 /*
  * For LRs which have HW bit set such as timer interrupts, we modify them to
