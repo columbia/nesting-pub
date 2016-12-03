@@ -414,3 +414,9 @@ void vgic_v2_put(struct kvm_vcpu *vcpu)
 
 	cpu_if->vgic_vmcr = readl_relaxed(vgic->vctrl_base + GICH_VMCR);
 }
+
+/* Return physical address of vgic virtual cpu interface */
+phys_addr_t vgic_vcpu_base(void)
+{
+	return kvm_vgic_global_state.vcpu_base;
+}
