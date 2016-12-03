@@ -206,6 +206,30 @@ static const struct vgic_register_region vgic_v2_gich_registers[] = {
 		4 * VGIC_V2_MAX_LRS, VGIC_ACCESS_32bit),
 };
 
+int vgic_register_gich_iodev(struct kvm *kvm, struct vgic_dist *dist)
+{
+	struct vgic_io_device *io_device = &kvm->arch.vgic.hyp_iodev;
+	int ret = 0;
+	unsigned int len;
+
+	len = KVM_VGIC_V2_GICH_SIZE;
+
+	io_device->regions = vgic_v2_gich_registers;
+	io_device->nr_regions = ARRAY_SIZE(vgic_v2_gich_registers);
+	kvm_iodevice_init(&io_device->dev, &kvm_io_gic_ops);
+
+	io_device->base_addr = KVM_VGIC_V2_GICH_BASE;
+	io_device->iodev_type = IODEV_GICH;
+	io_device->redist_vcpu = NULL;
+
+	mutex_lock(&kvm->slots_lock);
+	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, KVM_VGIC_V2_GICH_BASE,
+			len, &io_device->dev);
+	mutex_unlock(&kvm->slots_lock);
+
+	return ret;
+}
+
 /*
  * For LRs which have HW bit set such as timer interrupts, we modify them to
  * have the host hardware interrupt number instead of the virtual one programmed

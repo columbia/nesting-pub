@@ -121,8 +121,14 @@ int vgic_lazy_init(struct kvm *kvm);
 int vgic_init(struct kvm *kvm);
 
 #ifdef CONFIG_KVM_ARM_NESTED_HYP
+int vgic_register_gich_iodev(struct kvm *kvm, struct vgic_dist *dist);
 void vgic_init_nested(struct kvm_vcpu *vcpu);
 #else
+static inline int vgic_register_gich_iodev(struct kvm *kvm,
+		struct vgic_dist *dist)
+{
+	return 0;
+}
 static inline void vgic_init_nested(struct kvm_vcpu *vcpu)
 {
 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;

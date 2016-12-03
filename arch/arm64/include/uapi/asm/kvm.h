@@ -99,6 +99,12 @@ struct kvm_regs {
 #define KVM_ARM_VCPU_PMU_V3		3 /* Support guest PMUv3 */
 #define KVM_ARM_VCPU_NESTED_VIRT	4 /* Support nested virtual EL2 */
 
+/* FIXME: This should come from DT */
+#ifdef CONFIG_KVM_ARM_NESTED_HYP
+#define KVM_VGIC_V2_GICH_BASE          0x08030000
+#define KVM_VGIC_V2_GICH_SIZE          0x2000
+#endif
+
 struct kvm_vcpu_init {
 	__u32 target;
 	__u32 features[7];

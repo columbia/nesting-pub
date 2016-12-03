@@ -280,6 +280,13 @@ int vgic_v2_map_resources(struct kvm *kvm)
 		goto out;
 	}
 
+	/* Register virtual GICH interface to kvm io bus */
+	ret = vgic_register_gich_iodev(kvm, dist);
+	if (ret) {
+		kvm_err("Unable to register VGIC GICH regions\n");
+		goto out;
+	}
+
 	if (!static_branch_unlikely(&vgic_v2_cpuif_trap)) {
 		ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
 					    kvm_vgic_global_state.vcpu_base,
