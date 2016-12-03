@@ -220,4 +220,6 @@ int vgic_debug_destroy(struct kvm *kvm);
 bool lock_all_vcpus(struct kvm *kvm);
 void unlock_all_vcpus(struct kvm *kvm);
 
+void vgic_init_nested(struct kvm_vcpu *vcpu);
+
 #endif
