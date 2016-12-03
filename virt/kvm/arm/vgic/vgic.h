@@ -247,4 +247,6 @@ void vgic_v4_teardown(struct kvm *kvm);
 int vgic_v4_sync_hwstate(struct kvm_vcpu *vcpu);
 int vgic_v4_flush_hwstate(struct kvm_vcpu *vcpu);
 
+void vgic_init_nested(struct kvm_vcpu *vcpu);
+
 #endif
