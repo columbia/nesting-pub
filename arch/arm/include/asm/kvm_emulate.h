@@ -101,6 +101,11 @@ static inline bool vcpu_mode_el2(const struct kvm_vcpu *vcpu)
 	return false;
 }
 
+static inline bool vcpu_el2_imo_is_set(const struct kvm_vcpu *vcpu)
+{
+	return false;
+}
+
 static inline unsigned long *vcpu_pc(struct kvm_vcpu *vcpu)
 {
 	return &vcpu->arch.ctxt.gp_regs.usr_regs.ARM_pc;

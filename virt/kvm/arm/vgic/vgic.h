@@ -120,4 +120,15 @@ int kvm_register_vgic_device(unsigned long type);
 int vgic_lazy_init(struct kvm *kvm);
 int vgic_init(struct kvm *kvm);
 
+#ifdef CONFIG_KVM_ARM_NESTED_HYP
+void vgic_init_nested(struct kvm_vcpu *vcpu);
+#else
+static inline void vgic_init_nested(struct kvm_vcpu *vcpu)
+{
+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+
+	vgic_cpu->hw_v2_cpu_if = &vgic_cpu->vgic_v2;
+}
+#endif
+
 #endif

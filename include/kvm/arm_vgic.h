@@ -312,6 +312,14 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
 
 int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
 
+#ifdef CONFIG_KVM_ARM_NESTED_HYP
+void vgic_v2_setup_shadow_state(struct kvm_vcpu *vcpu);
+void vgic_v2_restore_shadow_state(struct kvm_vcpu *vcpu);
+#else
+static inline void vgic_v2_setup_shadow_state(struct kvm_vcpu *vcpu) { }
+static inline void vgic_v2_restore_shadow_state(struct kvm_vcpu *vcpu) { }
+#endif
+
 #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
 #define vgic_initialized(k)	((k)->arch.vgic.initialized)
 #define vgic_ready(k)		((k)->arch.vgic.ready)

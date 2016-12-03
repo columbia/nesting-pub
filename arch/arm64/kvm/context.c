@@ -161,6 +161,8 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
 		ctxt->hw_sys_regs = ctxt->sys_regs;
 		ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
 	}
+
+	vgic_v2_setup_shadow_state(vcpu);
 }
 
 /**
@@ -179,6 +181,8 @@ void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
 		*vcpu_cpsr(vcpu) = ctxt->hw_pstate;
 		ctxt->gp_regs.sp_el1 = ctxt->hw_sp_el1;
 	}
+
+	vgic_v2_restore_shadow_state(vcpu);
 }
 
 void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt)

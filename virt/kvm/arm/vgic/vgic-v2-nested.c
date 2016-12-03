@@ -205,3 +205,102 @@ static const struct vgic_register_region vgic_v2_gich_registers[] = {
 		vgic_mmio_read_v2_gich, vgic_mmio_write_v2_gich,
 		4 * VGIC_V2_MAX_LRS, VGIC_ACCESS_32bit),
 };
+
+/*
+ * For LRs which have HW bit set such as timer interrupts, we modify them to
+ * have the host hardware interrupt number instead of the virtual one programmed
+ * by the guest hypervisor.
+ */
+static void vgic_v2_create_shadow_lr(struct kvm_vcpu *vcpu)
+{
+	int i;
+	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
+	struct vgic_v2_cpu_if *s_cpu_if = vcpu_shadow_if(vcpu);
+	struct vgic_irq *irq;
+
+	int nr_lr = kvm_vgic_global_state.nr_lr;
+
+	for (i = 0; i < nr_lr; i++) {
+		u32 lr = cpu_if->vgic_lr[i];
+		int l1_irq;
+
+		if (!(lr & GICH_LR_HW))
+			goto next;
+
+		/* We have the HW bit set */
+		l1_irq = (lr & GICH_LR_PHYSID_CPUID) >>
+			GICH_LR_PHYSID_CPUID_SHIFT;
+		irq = vgic_get_irq(vcpu->kvm, vcpu, l1_irq);
+
+		if (!irq->hw) {
+			/* There was no real mapping, so nuke the HW bit */
+			lr &= ~GICH_LR_HW;
+			vgic_put_irq(vcpu->kvm, irq);
+			goto next;
+		}
+
+		/* Translate the virtual mapping to the real one */
+		lr &= ~GICH_LR_EOI;
+		lr &= ~GICH_LR_PHYSID_CPUID;
+		lr |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
+		vgic_put_irq(vcpu->kvm, irq);
+
+next:
+		s_cpu_if->vgic_lr[i] = lr;
+	}
+}
+
+/*
+ * Change the shadow HWIRQ field back to the virtual value before copying over
+ * the entire shadow struct to the nested state.
+ */
+static void vgic_v2_restore_shadow_lr(struct kvm_vcpu *vcpu)
+{
+	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
+	struct vgic_v2_cpu_if *s_cpu_if = vcpu_shadow_if(vcpu);
+	int nr_lr = kvm_vgic_global_state.nr_lr;
+	int lr;
+
+	for (lr = 0; lr < nr_lr; lr++) {
+		s_cpu_if->vgic_lr[lr] &= ~GICH_LR_PHYSID_CPUID;
+		s_cpu_if->vgic_lr[lr] |= cpu_if->vgic_lr[lr] &
+			GICH_LR_PHYSID_CPUID;
+	}
+}
+
+void vgic_v2_setup_shadow_state(struct kvm_vcpu *vcpu)
+{
+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+	struct vgic_v2_cpu_if *cpu_if;
+
+	if (vcpu_el2_imo_is_set(vcpu) && !vcpu_mode_el2(vcpu)) {
+		vgic_cpu->shadow_vgic_v2 = vgic_cpu->nested_vgic_v2;
+		vgic_v2_create_shadow_lr(vcpu);
+		cpu_if = vcpu_shadow_if(vcpu);
+	} else {
+		cpu_if = &vgic_cpu->vgic_v2;
+	}
+
+	vgic_cpu->hw_v2_cpu_if = cpu_if;
+}
+
+void vgic_v2_restore_shadow_state(struct kvm_vcpu *vcpu)
+{
+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+
+	/* Not using shadow state: Nothing to do... */
+	if (vgic_cpu->hw_v2_cpu_if == &vgic_cpu->vgic_v2)
+		return;
+
+	/*
+	 * Translate the shadow state HW fields back to the virtual ones
+	 * before copying the shadow struct back to the nested one.
+	 */
+	vgic_v2_restore_shadow_lr(vcpu);
+	vgic_cpu->nested_vgic_v2 = vgic_cpu->shadow_vgic_v2;
+}
+
+void vgic_init_nested(struct kvm_vcpu *vcpu)
+{
+	vgic_v2_setup_shadow_state(vcpu);
+}
