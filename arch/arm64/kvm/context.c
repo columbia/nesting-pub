@@ -335,6 +335,8 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
 	}
 
 	setup_s2_mmu(vcpu);
+
+	vgic_v2_setup_shadow_state(vcpu);
 }
 
 /**
@@ -349,6 +351,8 @@ void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
 		sync_shadow_el1_sysregs(vcpu);
 	} else
 		sync_special_regs(vcpu);
+
+	vgic_v2_restore_shadow_state(vcpu);
 }
 
 void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt)

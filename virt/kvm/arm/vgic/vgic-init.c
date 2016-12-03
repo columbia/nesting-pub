@@ -235,6 +235,8 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
 	int ret = 0;
 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
 
+	vgic_init_nested(vcpu);
+
 	if (!irqchip_in_kernel(vcpu->kvm))
 		return 0;
 
@@ -247,6 +249,7 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
 		ret = vgic_register_redist_iodev(vcpu);
 		mutex_unlock(&vcpu->kvm->lock);
 	}
+
 	return ret;
 }
 

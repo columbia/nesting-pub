@@ -175,6 +175,11 @@ static inline bool vcpu_mode_el2(const struct kvm_vcpu *vcpu)
 	return mode == PSR_MODE_EL2h || mode == PSR_MODE_EL2t;
 }
 
+static inline bool vcpu_el2_imo_is_set(const struct kvm_vcpu *vcpu)
+{
+	return (vcpu_sys_reg(vcpu, HCR_EL2) & HCR_IMO);
+}
+
 static inline bool vcpu_el2_e2h_is_set(const struct kvm_vcpu *vcpu)
 {
 	return (vcpu_sys_reg(vcpu, HCR_EL2) & HCR_E2H);
