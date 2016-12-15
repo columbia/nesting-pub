@@ -45,6 +45,10 @@ void kvm_inject_undef32(struct kvm_vcpu *vcpu);
 void kvm_inject_dabt32(struct kvm_vcpu *vcpu, unsigned long addr);
 void kvm_inject_pabt32(struct kvm_vcpu *vcpu, unsigned long addr);
 
+void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu);
+void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu);
+void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt);
+
 static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
 {
 	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
