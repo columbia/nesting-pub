@@ -689,6 +689,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 		}
 
 		kvm_arm_setup_debug(vcpu);
+		kvm_arm_setup_shadow_state(vcpu);
 
 		/**************************************************************
 		 * Enter the guest
@@ -704,6 +705,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 		 * Back from guest
 		 *************************************************************/
 
+		kvm_arm_restore_shadow_state(vcpu);
 		kvm_arm_clear_debug(vcpu);
 
 		/*
@@ -1334,6 +1336,16 @@ static void teardown_hyp_mode(void)
 
 static int init_vhe_mode(void)
 {
+	int cpu;
+
+	for_each_possible_cpu(cpu) {
+		kvm_cpu_context_t *cpu_ctxt;
+
+		cpu_ctxt = per_cpu_ptr(kvm_host_cpu_state, cpu);
+
+		kvm_arm_init_cpu_context(cpu_ctxt);
+	}
+
 	kvm_info("VHE mode initialized successfully\n");
 	return 0;
 }
@@ -1416,6 +1428,8 @@ static int init_hyp_mode(void)
 			kvm_err("Cannot map host CPU state: %d\n", err);
 			goto out_err;
 		}
+
+		kvm_arm_init_cpu_context(cpu_ctxt);
 	}
 
 	kvm_info("Hyp mode initialized successfully\n");
