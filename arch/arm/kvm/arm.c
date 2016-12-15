@@ -41,6 +41,7 @@
 #include <asm/virt.h>
 #include <asm/kvm_arm.h>
 #include <asm/kvm_asm.h>
+#include <asm/kvm_hyp.h>
 #include <asm/kvm_mmu.h>
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_coproc.h>
@@ -646,6 +647,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 		}
 
 		kvm_arm_setup_debug(vcpu);
+		kvm_arm_setup_shadow_state(vcpu);
 
 		/**************************************************************
 		 * Enter the guest
@@ -662,6 +664,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 		 * Back from guest
 		 *************************************************************/
 
+		kvm_arm_restore_shadow_state(vcpu);
 		kvm_arm_clear_debug(vcpu);
 
 		/*
@@ -1369,6 +1372,8 @@ static int init_hyp_mode(void)
 			kvm_err("Cannot map host CPU state: %d\n", err);
 			goto out_err;
 		}
+
+		kvm_arm_init_cpu_context(cpu_ctxt);
 	}
 
 	kvm_info("Hyp mode initialized successfully\n");

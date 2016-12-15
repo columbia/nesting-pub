@@ -47,6 +47,10 @@ void kvm_inject_vabt(struct kvm_vcpu *vcpu);
 void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
 void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
 
+static inline void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu) { };
+static inline void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu) { };
+static inline void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt) { };
+
 static inline bool kvm_condition_valid(const struct kvm_vcpu *vcpu)
 {
 	return kvm_condition_valid32(vcpu);
