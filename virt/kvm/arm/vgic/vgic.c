@@ -17,6 +17,7 @@
 #include <linux/kvm.h>
 #include <linux/kvm_host.h>
 #include <linux/list_sort.h>
+#include <asm/kvm_emulate.h>
 
 #include "vgic.h"
 
@@ -652,6 +653,28 @@ next:
 	/* Nuke remaining LRs */
 	for ( ; count < kvm_vgic_global_state.nr_lr; count++)
 		vgic_clear_lr(vcpu, count);
+
+	/*
+	 * If we have any pending IRQ for the guest and the guest expects IRQs
+	 * to be handled in its virtual EL2 mode (the virtual IMO bit is set)
+	 * and it is not already running in virtual EL2 mode, then we have to
+	 * emulate an IRQ exception to virtual IRQ. Note that a pending IRQ
+	 * means an irq of which state is pending but not active.
+	 */
+	if (vcpu_el2_imo_is_set(vcpu) && !vcpu_mode_el2(vcpu)) {
+		bool pending = false;
+
+		list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+			spin_lock(&irq->irq_lock);
+			pending = irq->pending && irq->enabled && !irq->active;
+			spin_unlock(&irq->irq_lock);
+
+			if (pending) {
+				kvm_inject_nested_irq(vcpu);
+				break;
+			}
+		}
+	}
 }
 
 /* Sync back the hardware VGIC state into our emulation after a guest's run. */
