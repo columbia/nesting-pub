@@ -192,9 +192,9 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
 	 * If this virtual IRQ was written into a list register, we
 	 * have to make sure the CPU that runs the VCPU thread has
 	 * synced back LR state to the struct vgic_irq.  We can only
-	 * know this for sure, when either this irq is not assigned to
+	 * know this for sure, when this irq is not assigned to
 	 * anyone's AP list anymore, or the VCPU thread is not
-	 * running on any CPUs.
+	 * running on any CPUs, or current thread is the VCPU thread.
 	 *
 	 * In the opposite case, we know the VCPU thread may be on its
 	 * way back from the guest and still has to sync back this
@@ -202,6 +202,7 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
 	 * other thread sync back the IRQ.
 	 */
 	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
+	       irq->vcpu != vcpu && /* Current thread is not the VCPU thread */
 	       irq->vcpu->cpu != -1) /* VCPU thread is running */
 		cond_resched_lock(&irq->irq_lock);
 
