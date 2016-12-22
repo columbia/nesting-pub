@@ -1,0 +1,4 @@
+v1-->v2:
+Added Linaro in the copyright.
+Allowed to inject exceptions while the current exception level is virtual EL2.
+Rewrote the comment message.
