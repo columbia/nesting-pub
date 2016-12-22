@@ -47,6 +47,20 @@ void kvm_inject_vabt(struct kvm_vcpu *vcpu);
 void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
 void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
 
+static inline int kvm_inject_nested_sync(struct kvm_vcpu *vcpu, u64 esr_el2)
+{
+	kvm_err("Unexpected call to %s for the non-nesting configuration\n",
+		 __func__);
+	return -EINVAL;
+}
+
+static inline int kvm_inject_nested_irq(struct kvm_vcpu *vcpu)
+{
+	kvm_err("Unexpected call to %s for the non-nesting configuration\n",
+		 __func__);
+	return -EINVAL;
+}
+
 static inline void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu) { };
 static inline void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu) { };
 static inline void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt) { };

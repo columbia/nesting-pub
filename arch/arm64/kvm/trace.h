@@ -167,6 +167,26 @@ TRACE_EVENT(kvm_set_guest_debug,
 );
 
 
+TRACE_EVENT(kvm_inject_nested_exception,
+	TP_PROTO(struct kvm_vcpu *vcpu, unsigned long esr_el2,
+		 unsigned long pc),
+	TP_ARGS(vcpu, esr_el2, pc),
+
+	TP_STRUCT__entry(
+		__field(struct kvm_vcpu *,	vcpu)
+		__field(unsigned long,		esr_el2)
+		__field(unsigned long,		pc)
+	),
+
+	TP_fast_assign(
+		__entry->vcpu = vcpu;
+		__entry->esr_el2 = esr_el2;
+		__entry->pc = pc;
+	),
+
+	TP_printk("vcpu: %p, inject exception to vEL2: ESR_EL2 0x%lx, vector: 0x%016lx",
+		  __entry->vcpu, __entry->esr_el2, __entry->pc)
+);
 #endif /* _TRACE_ARM64_KVM_H */
 
 #undef TRACE_INCLUDE_PATH
