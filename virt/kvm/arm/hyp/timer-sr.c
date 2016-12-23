@@ -20,6 +20,7 @@
 #include <linux/kvm_host.h>
 
 #include <asm/kvm_hyp.h>
+#include <asm/kvm_emulate.h>
 
 /* vcpu is already in the HYP VA space */
 void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
@@ -56,6 +57,7 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 	u64 val;
+	u64 cntvoff;
 
 	/* Those bits are already configured at boot on VHE-system */
 	if (!has_vhe()) {
@@ -70,7 +72,8 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
 	}
 
 	if (timer->enabled) {
-		write_sysreg(vtimer->cntvoff, cntvoff_el2);
+		cntvoff = vtimer->cntvoff + kvm_get_vcntvoff(vcpu);
+		write_sysreg(cntvoff, cntvoff_el2);
 		write_sysreg_el0(vtimer->cnt_cval, cntv_cval);
 		isb();
 		write_sysreg_el0(vtimer->cnt_ctl, cntv_ctl);

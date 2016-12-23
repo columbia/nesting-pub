@@ -324,4 +324,10 @@ static inline bool kvm_is_shadow_s2_fault(struct kvm_vcpu *vcpu)
 	return false;
 }
 
+/* Return the guest hypervisor's cntvoff value */
+static inline u64 kvm_get_vcntvoff(struct kvm_vcpu *vcpu)
+{
+	return 0;
+}
+
 #endif /* __ARM_KVM_EMULATE_H__ */
