@@ -39,7 +39,7 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
 	vcpu_vtimer(vcpu)->active_cleared_last = false;
 }
 
-static cycle_t kvm_phys_timer_read(void)
+cycle_t kvm_phys_timer_read(void)
 {
 	return timecounter->cc->read(timecounter->cc);
 }
@@ -258,7 +258,7 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
  * Schedule the background timer for the emulated timer. The background timer
  * runs whenever vcpu is runnable and the timer is not expired.
  */
-static void kvm_timer_emulate(struct kvm_vcpu *vcpu,
+void kvm_timer_emulate(struct kvm_vcpu *vcpu,
 		       struct arch_timer_context *timer_ctx)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;

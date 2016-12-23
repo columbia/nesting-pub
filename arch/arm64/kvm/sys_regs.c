@@ -824,7 +824,15 @@ static bool access_cntp_tval(struct kvm_vcpu *vcpu,
 		struct sys_reg_params *p,
 		const struct sys_reg_desc *r)
 {
-	kvm_inject_undefined(vcpu);
+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+	cycle_t now = kvm_phys_timer_read();
+
+	if (p->is_write) {
+		ptimer->cnt_cval = p->regval + now;
+		kvm_timer_emulate(vcpu, ptimer);
+	} else
+		p->regval = ptimer->cnt_cval - now;
+
 	return true;
 }
 
@@ -832,7 +840,21 @@ static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
 		struct sys_reg_params *p,
 		const struct sys_reg_desc *r)
 {
-	kvm_inject_undefined(vcpu);
+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+
+	if (p->is_write) {
+		/* ISTATUS bit is read-only */
+		ptimer->cnt_ctl = p->regval & ~ARCH_TIMER_CTRL_IT_STAT;
+		kvm_timer_emulate(vcpu, ptimer);
+	} else {
+		cycle_t now = kvm_phys_timer_read();
+
+		p->regval = ptimer->cnt_ctl;
+		/* Set ISTATUS bit if it's expired */
+		if (ptimer->cnt_cval <= now)
+			p->regval |= ARCH_TIMER_CTRL_IT_STAT;
+	}
+
 	return true;
 }
 
@@ -840,7 +862,14 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
 		struct sys_reg_params *p,
 		const struct sys_reg_desc *r)
 {
-	kvm_inject_undefined(vcpu);
+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+
+	if (p->is_write) {
+		ptimer->cnt_cval = p->regval;
+		kvm_timer_emulate(vcpu, ptimer);
+	} else
+		p->regval = ptimer->cnt_cval;
+
 	return true;
 }
 

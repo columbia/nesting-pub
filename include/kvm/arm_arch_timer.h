@@ -75,6 +75,9 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
 			   struct arch_timer_context *timer_ctx);
 void kvm_timer_schedule(struct kvm_vcpu *vcpu);
 void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
+void kvm_timer_emulate(struct kvm_vcpu *vcpu, struct arch_timer_context *timer);
+
+cycle_t kvm_phys_timer_read(void);
 
 void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
 
