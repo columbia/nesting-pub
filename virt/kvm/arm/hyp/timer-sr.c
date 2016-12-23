@@ -20,6 +20,7 @@
 #include <linux/kvm_host.h>
 
 #include <asm/kvm_hyp.h>
+#include <asm/kvm_emulate.h>
 
 /* vcpu is already in the HYP VA space */
 void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
@@ -49,6 +50,7 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 	u64 val;
+	u64 cntvoff;
 
 	/*
 	 * Disallow physical timer access for the guest
@@ -60,7 +62,8 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
 	write_sysreg(val, cnthctl_el2);
 
 	if (vtimer->enabled) {
-		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
+		cntvoff = kvm->arch.timer.cntvoff + kvm_get_vcntvoff(vcpu);
+		write_sysreg(cntvoff, cntvoff_el2);
 		write_sysreg_el0(vtimer->cnt_cval, cntv_cval);
 		isb();
 		write_sysreg_el0(vtimer->cnt_ctl, cntv_ctl);

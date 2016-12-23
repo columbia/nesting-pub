@@ -24,6 +24,7 @@
 
 #include <clocksource/arm_arch_timer.h>
 #include <asm/arch_timer.h>
+#include <asm/kvm_emulate.h>
 
 #include <kvm/arm_vgic.h>
 #include <kvm/arm_arch_timer.h>
@@ -102,7 +103,7 @@ static u64 kvm_timer_cntvoff(struct kvm_vcpu *vcpu,
 			     struct arch_timer_context *timer_ctx)
 {
 	if (timer_ctx == vcpu_vtimer(vcpu))
-		return vcpu->kvm->arch.timer.cntvoff;
+		return vcpu->kvm->arch.timer.cntvoff + kvm_get_vcntvoff(vcpu);
 
 	return 0;
 }
