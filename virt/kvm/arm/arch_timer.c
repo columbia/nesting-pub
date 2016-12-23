@@ -26,6 +26,7 @@
 #include <clocksource/arm_arch_timer.h>
 #include <asm/arch_timer.h>
 #include <asm/kvm_hyp.h>
+#include <asm/kvm_emulate.h>
 
 #include <kvm/arm_vgic.h>
 #include <kvm/arm_arch_timer.h>
@@ -109,12 +110,22 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
 	kvm_vcpu_wake_up(vcpu);
 }
 
-static u64 kvm_timer_compute_delta(struct arch_timer_context *timer_ctx)
+static u64 kvm_timer_cntvoff(struct kvm_vcpu *vcpu,
+			     struct arch_timer_context *timer_ctx)
+{
+	if (timer_ctx == vcpu_vtimer(vcpu))
+		return vcpu_vtimer(vcpu)->cntvoff + kvm_get_vcntvoff(vcpu);
+
+	return 0;
+}
+
+static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu,
+				   struct arch_timer_context *timer_ctx)
 {
 	u64 cval, now;
 
 	cval = timer_ctx->cnt_cval;
-	now = kvm_phys_timer_read() - timer_ctx->cntvoff;
+	now = kvm_phys_timer_read() - kvm_timer_cntvoff(vcpu, timer_ctx);
 
 	if (now < cval) {
 		u64 ns;
@@ -146,10 +157,10 @@ static u64 kvm_timer_earliest_exp(struct kvm_vcpu *vcpu)
 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
 
 	if (kvm_timer_irq_can_fire(vtimer))
-		min_virt = kvm_timer_compute_delta(vtimer);
+		min_virt = kvm_timer_compute_delta(vcpu, vtimer);
 
 	if (kvm_timer_irq_can_fire(ptimer))
-		min_phys = kvm_timer_compute_delta(ptimer);
+		min_phys = kvm_timer_compute_delta(vcpu, ptimer);
 
 	/* If none of timers can fire, then return 0 */
 	if ((min_virt == ULLONG_MAX) && (min_phys == ULLONG_MAX))
@@ -182,7 +193,7 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
 	return HRTIMER_NORESTART;
 }
 
-bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
+bool kvm_timer_should_fire(struct kvm_vcpu *vcpu, struct arch_timer_context *timer_ctx)
 {
 	u64 cval, now;
 
@@ -190,7 +201,7 @@ bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
 		return false;
 
 	cval = timer_ctx->cnt_cval;
-	now = kvm_phys_timer_read() - timer_ctx->cntvoff;
+	now = kvm_phys_timer_read() - kvm_timer_cntvoff(vcpu, timer_ctx);
 
 	return cval <= now;
 }
@@ -251,10 +262,10 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
 	if (unlikely(!timer->enabled))
 		return;
 
-	if (kvm_timer_should_fire(vtimer) != vtimer->irq.level)
+	if (kvm_timer_should_fire(vcpu, vtimer) != vtimer->irq.level)
 		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
 
-	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
+	if (kvm_timer_should_fire(vcpu, ptimer) != ptimer->irq.level)
 		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
 }
 
@@ -264,14 +275,14 @@ static void kvm_timer_emulate(struct kvm_vcpu *vcpu,
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 
-	if (kvm_timer_should_fire(timer_ctx))
+	if (kvm_timer_should_fire(vcpu, timer_ctx))
 		return;
 
 	if (!kvm_timer_irq_can_fire(timer_ctx))
 		return;
 
 	/*  The timer has not yet expired, schedule a background timer */
-	timer_arm(timer, kvm_timer_compute_delta(timer_ctx));
+	timer_arm(timer, kvm_timer_compute_delta(vcpu, timer_ctx));
 }
 
 /*
@@ -292,7 +303,7 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
 	 * already expired, because kvm_vcpu_block will return before putting
 	 * the thread to sleep.
 	 */
-	if (kvm_timer_should_fire(vtimer) || kvm_timer_should_fire(ptimer))
+	if (kvm_timer_should_fire(vcpu, vtimer) || kvm_timer_should_fire(vcpu, ptimer))
 		return;
 
 	/*

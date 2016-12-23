@@ -420,4 +420,10 @@ static inline bool kvm_is_shadow_s2_fault(struct kvm_vcpu *vcpu)
 	return vcpu_nested_stage2_enabled(vcpu) && !is_hyp_ctxt(vcpu);
 }
 
+/* Return the guest hypervisor's cntvoff value */
+static inline u64 kvm_get_vcntvoff(struct kvm_vcpu *vcpu)
+{
+	return vcpu_sys_reg(vcpu, CNTVOFF_EL2);
+}
+
 #endif /* __ARM64_KVM_EMULATE_H__ */
