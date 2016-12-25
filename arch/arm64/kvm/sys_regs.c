@@ -873,6 +873,18 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
 	return true;
 }
 
+static bool trap_el2_reg(struct kvm_vcpu *vcpu,
+			 struct sys_reg_params *p,
+			 const struct sys_reg_desc *r)
+{
+	if (!p->is_write)
+		p->regval = vcpu_el2_reg(vcpu, r->reg);
+	else
+		vcpu_el2_reg(vcpu, r->reg) = p->regval;
+
+	return true;
+}
+
 /*
  * Architected system registers.
  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
@@ -1163,15 +1175,122 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b1111), Op2(0b111),
 	  access_pmu_evtyper, reset_val, PMCCFILTR_EL0, 0 },
 
+	/* VPIDR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0000), CRm(0b0000), Op2(0b000),
+	  trap_el2_reg, reset_el2_val, VPIDR_EL2, 0 },
+	/* VMPIDR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0000), CRm(0b0000), Op2(0b101),
+	  trap_el2_reg, reset_el2_val, VMPIDR_EL2, 0 },
+
+	/* SCTLR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0001), CRm(0b0000), Op2(0b000),
+	  trap_el2_reg, reset_el2_val, SCTLR_EL2, 0 },
+	/* ACTLR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0001), CRm(0b0000), Op2(0b001),
+	  trap_el2_reg, reset_el2_val, ACTLR_EL2, 0 },
+	/* HCR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0001), CRm(0b0001), Op2(0b000),
+	  trap_el2_reg, reset_el2_val, HCR_EL2, 0 },
+	/* MDCR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0001), CRm(0b0001), Op2(0b001),
+	  trap_el2_reg, reset_el2_val, MDCR_EL2, 0 },
+	/* CPTR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0001), CRm(0b0001), Op2(0b010),
+	  trap_el2_reg, reset_el2_val, CPTR_EL2, 0 },
+	/* HSTR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0001), CRm(0b0001), Op2(0b011),
+	  trap_el2_reg, reset_el2_val, HSTR_EL2, 0 },
+	/* HACR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0001), CRm(0b0001), Op2(0b111),
+	  trap_el2_reg, reset_el2_val, HACR_EL2, 0 },
+
+	/* TTBR0_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0010), CRm(0b0000), Op2(0b000),
+	  trap_el2_reg, reset_el2_val, TTBR0_EL2, 0 },
+	/* TCR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0010), CRm(0b0000), Op2(0b010),
+	  trap_el2_reg, reset_el2_val, TCR_EL2, 0 },
+	/* VTTBR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0010), CRm(0b0001), Op2(0b000),
+	  trap_el2_reg, reset_el2_val, VTTBR_EL2, 0 },
+	/* VTCR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0010), CRm(0b0001), Op2(0b010),
+	  trap_el2_reg, reset_el2_val, VTCR_EL2, 0 },
+
 	/* DACR32_EL2 */
 	{ Op0(0b11), Op1(0b100), CRn(0b0011), CRm(0b0000), Op2(0b000),
 	  NULL, reset_unknown, DACR32_EL2 },
+
+	/* SPSR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0100), CRm(0b0000), Op2(0b000),
+	  trap_el2_reg, reset_el2_val, SPSR_EL2, 0 },
+	/* ELR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0100), CRm(0b0000), Op2(0b001),
+	  trap_el2_reg, reset_el2_val, ELR_EL2, 0 },
+	/* SP_EL1 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0100), CRm(0b0001), Op2(0b000),
+	  trap_el2_reg },
+
 	/* IFSR32_EL2 */
 	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0000), Op2(0b001),
 	  NULL, reset_unknown, IFSR32_EL2 },
+	/* AFSR0_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0001), Op2(0b000),
+	  trap_el2_reg, reset_el2_val, AFSR0_EL2, 0 },
+	/* AFSR1_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0001), Op2(0b001),
+	  trap_el2_reg, reset_el2_val, AFSR1_EL2, 0 },
+	/* ESR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0010), Op2(0b000),
+	  trap_el2_reg, reset_el2_val, ESR_EL2, 0 },
 	/* FPEXC32_EL2 */
 	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0011), Op2(0b000),
 	  NULL, reset_val, FPEXC32_EL2, 0x70 },
+
+	/* FAR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0110), CRm(0b0000), Op2(0b000),
+	  trap_el2_reg, reset_el2_val, FAR_EL2, 0 },
+	/* HPFAR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b0110), CRm(0b0000), Op2(0b100),
+	  trap_el2_reg, reset_el2_val, HPFAR_EL2, 0 },
+
+	/* MAIR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b1010), CRm(0b0010), Op2(0b000),
+	  trap_el2_reg, reset_el2_val, MAIR_EL2, 0 },
+	/* AMAIR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b1010), CRm(0b0011), Op2(0b000),
+	  trap_el2_reg, reset_el2_val, AMAIR_EL2, 0 },
+
+	/* VBAR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b1100), CRm(0b0000), Op2(0b000),
+	  trap_el2_reg, reset_el2_val, VBAR_EL2, 0 },
+	/* RVBAR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b1100), CRm(0b0000), Op2(0b001),
+	  trap_el2_reg, reset_el2_val, RVBAR_EL2, 0 },
+	/* RMR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b1100), CRm(0b0000), Op2(0b010),
+	  trap_el2_reg, reset_el2_val, RMR_EL2, 0 },
+
+	/* TPIDR_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b1101), CRm(0b0000), Op2(0b010),
+	  trap_el2_reg, reset_el2_val, TPIDR_EL2, 0 },
+
+	/* CNTVOFF_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b1110), CRm(0b0000), Op2(0b011),
+	  trap_el2_reg, reset_el2_val, CNTVOFF_EL2, 0 },
+	/* CNTHCTL_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b1110), CRm(0b0001), Op2(0b000),
+	  trap_el2_reg, reset_el2_val, CNTHCTL_EL2, 0 },
+	/* CNTHP_TVAL_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b1110), CRm(0b0010), Op2(0b000),
+	  trap_el2_reg, reset_el2_val, CNTHP_TVAL_EL2, 0 },
+	/* CNTHP_CTL_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b1110), CRm(0b0010), Op2(0b001),
+	  trap_el2_reg, reset_el2_val, CNTHP_CTL_EL2, 0 },
+	/* CNTHP_CVAL_EL2 */
+	{ Op0(0b11), Op1(0b100), CRn(0b1110), CRm(0b0010), Op2(0b010),
+	  trap_el2_reg, reset_el2_val, CNTHP_CVAL_EL2, 0 },
+
 };
 
 static bool trap_dbgidr(struct kvm_vcpu *vcpu,
