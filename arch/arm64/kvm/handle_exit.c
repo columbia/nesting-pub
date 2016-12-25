@@ -29,6 +29,10 @@
 #include <asm/kvm_mmu.h>
 #include <asm/kvm_psci.h>
 
+#ifdef CONFIG_KVM_ARM_NESTED_HYP
+#include <asm/kvm_nested.h>
+#endif
+
 #define CREATE_TRACE_POINTS
 #include "trace.h"
 
@@ -42,6 +46,13 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
 			    kvm_vcpu_hvc_get_imm(vcpu));
 	vcpu->stat.hvc_exit_stat++;
 
+#ifdef CONFIG_KVM_ARM_NESTED_HYP
+	ret = handle_hvc_nested(vcpu);
+	if (ret < 0 && ret != -EINVAL)
+		return ret;
+	else if (ret >= 0)
+		return ret;
+#endif
 	ret = kvm_psci_call(vcpu);
 	if (ret < 0) {
 		kvm_inject_undefined(vcpu);
