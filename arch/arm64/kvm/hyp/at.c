@@ -107,12 +107,14 @@ void __hyp_text __kvm_at_insn(struct kvm_vcpu *vcpu, unsigned long vaddr,
 	case AT_S1E0W:
 		asm volatile("at s1e0w, %0" : : "r" (vaddr));
 		break;
+		/*
 	case AT_S1E1RP:
 		asm volatile("at s1e1rp, %0" : : "r" (vaddr));
 		break;
 	case AT_S1E1WP:
 		asm volatile("at s1e1wp, %0" : : "r" (vaddr));
 		break;
+		*/
 	default:
 		break;
 	}

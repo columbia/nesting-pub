@@ -206,7 +206,7 @@ static int handle_sve(struct kvm_vcpu *vcpu, struct kvm_run *run)
 	return 1;
 }
 
-static int kvm_handle_eret(struct kvm_vcpu *vcpu, struct kvm_run *run)
+int kvm_handle_eret(struct kvm_vcpu *vcpu, struct kvm_run *run)
 {
 	trace_kvm_nested_eret(vcpu, vcpu_el2_sreg(vcpu, ELR_EL2),
 			      vcpu_el2_sreg(vcpu, SPSR_EL2));
