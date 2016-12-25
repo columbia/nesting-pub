@@ -90,6 +90,23 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
 	return true;
 }
 
+static bool forward_vm_traps(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
+{
+	u64 hcr_el2 = vcpu_el2_reg(vcpu, HCR_EL2);
+
+	/* If this is a trap from the virtual EL2, the host handles */
+	if (vcpu_mode_el2(vcpu))
+		return false;
+
+	/* If the guest wants to trap on R/W operation, forward this trap */
+	if ((hcr_el2 & HCR_TVM) && p->is_write)
+		return true;
+	else if ((hcr_el2 & HCR_TRVM) && !p->is_write)
+		return true;
+
+	return false;
+}
+
 /*
  * Generic accessor for VM registers. Only called as long as HCR_TVM
  * is set. If the guest enables the MMU, we stop trapping the VM
@@ -100,6 +117,9 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
 			  const struct sys_reg_desc *r)
 {
 	bool was_enabled = vcpu_has_cache_enabled(vcpu);
+
+	if (forward_vm_traps(vcpu, p))
+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
 
 	BUG_ON(!vcpu_mode_el2(vcpu) && !p->is_write);
 
