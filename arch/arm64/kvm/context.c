@@ -18,6 +18,7 @@
 #include <linux/kvm_host.h>
 #include <asm/kvm_emulate.h>
 #include <asm/esr.h>
+#include <asm/kvm_mmu.h>
 
 struct el1_el2_map {
 	enum vcpu_sysreg	el1;
@@ -86,6 +87,15 @@ static void create_shadow_el1_sysregs(struct kvm_vcpu *vcpu)
 	s_sys_regs[TTBR1_EL1] = 0;
 
 	s_sys_regs[CPACR_EL1] = cptr_el2_to_cpacr_el1(el2_regs[CPTR_EL2]);
+}
+
+static void setup_s2_mmu(struct kvm_vcpu *vcpu)
+{
+	struct kvm_s2_mmu *mmu = &vcpu->kvm->arch.mmu;
+	struct kvm_s2_vmid *vmid = vcpu_get_active_vmid(vcpu);
+
+	vcpu->arch.hw_vttbr = kvm_get_vttbr(vmid, mmu);
+	vcpu->arch.hw_mmu = mmu;
 }
 
 /*
@@ -166,6 +176,8 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
 	}
 
 	vgic_v2_setup_shadow_state(vcpu);
+
+	setup_s2_mmu(vcpu);
 }
 
 /**
