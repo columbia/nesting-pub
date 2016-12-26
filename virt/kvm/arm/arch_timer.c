@@ -91,9 +91,6 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
 	vcpu = container_of(work, struct kvm_vcpu, arch.timer_cpu.expired);
 	vcpu->arch.timer_cpu.armed = false;
 
-	WARN_ON(!kvm_timer_should_fire(vcpu, vcpu_vtimer(vcpu)) &&
-		!kvm_timer_should_fire(vcpu, vcpu_ptimer(vcpu)));
-
 	/*
 	 * If the vcpu is blocked we want to wake it up so that it will see
 	 * the timer has expired when entering the guest.
@@ -139,7 +136,6 @@ static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx)
 
 /*
  * Returns minimal timer expiration time in ns among guest timers.
- * Note that it will return inf time if none of timers can fire.
  */
 static u64 kvm_timer_min_block(struct kvm_vcpu *vcpu)
 {
@@ -153,7 +149,9 @@ static u64 kvm_timer_min_block(struct kvm_vcpu *vcpu)
 	if (kvm_timer_irq_can_fire(ptimer))
 		min_phys = kvm_timer_compute_delta(vcpu, ptimer);
 
-	WARN_ON((min_virt == ULLONG_MAX) && (min_phys == ULLONG_MAX));
+	/* If none of timers can fire, then return 0 */
+	if ((min_virt == ULLONG_MAX) && (min_phys == ULLONG_MAX))
+		return 0;
 
 	return min(min_virt, min_phys);
 }
@@ -257,6 +255,26 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
 }
 
 /*
+ * Schedule the background timer for the emulated timer. The background timer
+ * runs whenever vcpu is runnable and the timer is not expired.
+ */
+static void kvm_timer_emulate(struct kvm_vcpu *vcpu,
+		       struct arch_timer_context *timer_ctx)
+{
+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+
+	if (kvm_timer_should_fire(vcpu, timer_ctx))
+		return;
+
+	if (!kvm_timer_irq_can_fire(timer_ctx))
+		return;
+
+	/*  The timer has not yet expired, schedule a background timer */
+	timer_disarm(timer);
+	timer_arm(timer, kvm_timer_compute_delta(vcpu, timer_ctx));
+}
+
+/*
  * Schedule the background timer before calling kvm_vcpu_block, so that this
  * thread is removed from its waitqueue and made runnable when there's a timer
  * interrupt to handle.
@@ -266,8 +284,6 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-
-	BUG_ON(timer_is_armed(timer));
 
 	/*
 	 * No need to schedule a background timer if any guest timer has
@@ -290,13 +306,21 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
 	 * The guest timers have not yet expired, schedule a background timer.
 	 * Pick smaller expiration time between phys and virt timer.
 	 */
+	timer_disarm(timer);
 	timer_arm(timer, kvm_timer_min_block(vcpu));
 }
 
 void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+
 	timer_disarm(timer);
+
+	/*
+	 * Now we return from the blocking. If we have any timer to emulate,
+	 * and it's not expired, set the background timer for it.
+	 */
+	kvm_timer_emulate(vcpu, vcpu_ptimer(vcpu));
 }
 
 /**
@@ -375,10 +399,6 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
  */
 void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
 {
-	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-
-	BUG_ON(timer_is_armed(timer));
-
 	/*
 	 * The guest could have modified the timer registers or the timer
 	 * could have expired, update the timer state.
