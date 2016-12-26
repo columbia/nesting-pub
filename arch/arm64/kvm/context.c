@@ -18,6 +18,7 @@
 #include <linux/kvm_host.h>
 #include <asm/kvm_emulate.h>
 #include <asm/esr.h>
+#include <asm/kvm_mmu.h>
 
 struct el1_el2_map {
 	enum vcpu_sysreg	el1;
@@ -174,6 +175,15 @@ static void flush_shadow_el1_sysregs(struct kvm_vcpu *vcpu)
 		flush_shadow_el1_sysregs_nvhe(vcpu);
 }
 
+static void setup_s2_mmu(struct kvm_vcpu *vcpu)
+{
+	struct kvm_s2_mmu *mmu = &vcpu->kvm->arch.mmu;
+	struct kvm_s2_vmid *vmid = vcpu_get_active_vmid(vcpu);
+
+	vcpu->arch.hw_vttbr = kvm_get_vttbr(vmid, mmu);
+	vcpu->arch.hw_mmu = mmu;
+}
+
 /*
  * List of EL0 and EL1 registers which we allow the virtual EL2 mode to access
  * directly without trapping. This is possible because the impact of
@@ -323,6 +333,8 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
 		setup_mpidr_el1(vcpu);
 		ctxt->hw_sys_regs = ctxt->sys_regs;
 	}
+
+	setup_s2_mmu(vcpu);
 }
 
 /**
