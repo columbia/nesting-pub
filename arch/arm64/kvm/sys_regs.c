@@ -2013,8 +2013,14 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
 static int emulate_tlbi(struct kvm_vcpu *vcpu,
 			     struct sys_reg_params *params)
 {
-	/* TODO: support tlbi instruction emulation*/
-	kvm_inject_undefined(vcpu);
+	/*
+	 * We unmap ALL stage-2 page tables on tlbi instruction.
+	 * We may make it more efficient by looking at the exact tlbi
+	 * instruction.
+	 */
+	stage2_unmap_vm(vcpu->kvm);
+	kvm_nested_s2_unmap(vcpu);
+
 	return 1;
 }
 
