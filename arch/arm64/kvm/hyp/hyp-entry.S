@@ -108,7 +108,7 @@ el1_trap:
 
 	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
 	cmp	x0, #ESR_ELx_EC_FP_ASIMD
-	b.eq	__fpsimd_guest_restore
+	b.eq	__fpsimd_guest_trap
 
 	mrs	x1, tpidr_el2
 	mov	x0, #ARM_EXCEPTION_TRAP

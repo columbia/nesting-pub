@@ -158,6 +158,20 @@ abort_guest_exit_end:
 1:	ret
 ENDPROC(__guest_exit)
 
+ENTRY(__fpsimd_guest_trap)
+#ifdef CONFIG_KVM_ARM_NESTED_HYP
+// If virtual CPTR_EL2.TFP is set, then foward it to the nested hyp.
+	mrs	x1, tpidr_el2
+	ldr	x0, [x1, #VIRTUAL_CPTR_EL2]
+	and 	x0, x0, #CPTR_EL2_TFP
+	cbnz	x0, 1f
+#endif
+	b	__fpsimd_guest_restore
+1:
+	mov	x0, #ARM_EXCEPTION_TRAP
+	b	__guest_exit
+ENDPROC(__fpsimd_guest_trap)
+
 ENTRY(__fpsimd_guest_restore)
 	stp	x2, x3, [sp, #-16]!
 	stp	x4, lr, [sp, #-16]!

@@ -195,6 +195,9 @@ static exit_handle_fn arm_exit_handlers[] = {
 	[ESR_ELx_EC_BREAKPT_LOW]= kvm_handle_guest_debug,
 	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
 	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
+#ifdef CONFIG_KVM_ARM_NESTED_HYP
+	[ESR_ELx_EC_FP_ASIMD]	= kvm_handle_fp_asimd,
+#endif
 };
 
 static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)

@@ -43,3 +43,9 @@ int handle_wfx_nested(struct kvm_vcpu *vcpu, bool is_wfe)
 
 	return -EINVAL;
 }
+
+/* This is only called when virtual CPTR_EL2.TFP bit is set. */
+int kvm_handle_fp_asimd(struct kvm_vcpu *vcpu, struct kvm_run *run)
+{
+	return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+}
