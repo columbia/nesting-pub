@@ -113,7 +113,7 @@ el1_trap:
 	 */
 alternative_if_not ARM64_HAS_NO_FPSIMD
 	cmp	x0, #ESR_ELx_EC_FP_ASIMD
-	b.eq	__fpsimd_guest_restore
+	b.eq	__fpsimd_guest_trap
 alternative_else_nop_endif
 
 	mrs	x1, tpidr_el2
