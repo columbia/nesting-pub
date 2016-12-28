@@ -951,6 +951,11 @@ static bool access_cpacr(struct kvm_vcpu *vcpu,
 		struct sys_reg_params *p,
 		const struct sys_reg_desc *r)
 {
+	/* Forward this trap to the guest hypervisor if it expects */
+	if (!vcpu_mode_el2(vcpu) &&
+	    (vcpu_el2_reg(vcpu, CPTR_EL2) & CPTR_EL2_TCPAC))
+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+
 	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
 	return true;
 }
