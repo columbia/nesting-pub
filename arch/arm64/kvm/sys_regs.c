@@ -898,6 +898,38 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
 	return true;
 }
 
+static inline void access_rw(struct sys_reg_params *p, u64 *sysreg)
+{
+	if (!p->is_write)
+		p->regval = *sysreg;
+	else
+		*sysreg = p->regval;
+}
+
+static bool access_elr(struct kvm_vcpu *vcpu,
+		struct sys_reg_params *p,
+		const struct sys_reg_desc *r)
+{
+	access_rw(p, &vcpu->arch.ctxt.gp_regs.elr_el1);
+	return true;
+}
+
+static bool access_spsr(struct kvm_vcpu *vcpu,
+		struct sys_reg_params *p,
+		const struct sys_reg_desc *r)
+{
+	access_rw(p, &vcpu->arch.ctxt.gp_regs.spsr[KVM_SPSR_EL1]);
+	return true;
+}
+
+static bool access_vbar(struct kvm_vcpu *vcpu,
+		struct sys_reg_params *p,
+		const struct sys_reg_desc *r)
+{
+	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
+	return true;
+}
+
 static bool trap_el2_reg(struct kvm_vcpu *vcpu,
 			 struct sys_reg_params *p,
 			 const struct sys_reg_desc *r)
@@ -1013,6 +1045,13 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b010),
 	  access_vm_reg, reset_val, TCR_EL1, 0 },
 
+	/* SPSR_EL1 */
+	{ Op0(0b11), Op1(0b000), CRn(0b0100), CRm(0b0000), Op2(0b000),
+	  access_spsr},
+	/* ELR_EL1 */
+	{ Op0(0b11), Op1(0b000), CRn(0b0100), CRm(0b0000), Op2(0b001),
+	  access_elr},
+
 	/* AFSR0_EL1 */
 	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0001), Op2(0b000),
 	  access_vm_reg, reset_unknown, AFSR0_EL1 },
@@ -1045,7 +1084,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 
 	/* VBAR_EL1 */
 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
-	  NULL, reset_val, VBAR_EL1, 0 },
+	  access_vbar, reset_val, VBAR_EL1, 0 },
 
 	/* ICC_SGI1R_EL1 */
 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1011), Op2(0b101),
