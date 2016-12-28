@@ -25,3 +25,21 @@ int handle_hvc_nested(struct kvm_vcpu *vcpu)
 {
 	return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
 }
+
+/*
+ * Inject wfx to the nested hypervisor if this is from the nested VM and
+ * the virtual HCR_EL2.TWX is set. Otherwise, let the host hypervisor
+ * handle this.
+ */
+int handle_wfx_nested(struct kvm_vcpu *vcpu, bool is_wfe)
+{
+	u64 hcr_el2 = vcpu_el2_reg(vcpu, HCR_EL2);
+
+	if (vcpu_mode_el2(vcpu))
+		return -EINVAL;
+
+	if ((is_wfe && (hcr_el2 & HCR_TWE)) || (!is_wfe && (hcr_el2 & HCR_TWI)))
+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+
+	return -EINVAL;
+}
