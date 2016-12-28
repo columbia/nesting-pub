@@ -25,10 +25,25 @@
 void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
+	if (unlikely(vcpu_mode_el2(vcpu))) {
+		ctxt->hw_pstate = *vcpu_cpsr(vcpu) & ~PSR_MODE_MASK;
 
-	ctxt->hw_pstate = *vcpu_cpsr(vcpu);
-	ctxt->hw_sys_regs = ctxt->sys_regs;
-	ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
+		/*
+		 * We emulate virtual EL2 mode in hardware EL1 mode using the
+		 * same stack pointer mode as the guest expects.
+		 */
+		if ((*vcpu_cpsr(vcpu) & PSR_MODE_MASK) == PSR_MODE_EL2h)
+			ctxt->hw_pstate |= PSR_MODE_EL1h;
+		else
+			ctxt->hw_pstate |= PSR_MODE_EL1t;
+
+		ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
+		ctxt->hw_sp_el1 = ctxt->el2_regs[SP_EL2];
+	} else {
+		ctxt->hw_pstate = *vcpu_cpsr(vcpu);
+		ctxt->hw_sys_regs = ctxt->sys_regs;
+		ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
+	}
 }
 
 /**
@@ -38,9 +53,14 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
 void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
-
-	*vcpu_cpsr(vcpu) = ctxt->hw_pstate;
-	ctxt->gp_regs.sp_el1 = ctxt->hw_sp_el1;
+	if (unlikely(vcpu_mode_el2(vcpu))) {
+		*vcpu_cpsr(vcpu) &= PSR_MODE_MASK;
+		*vcpu_cpsr(vcpu) |= ctxt->hw_pstate & ~PSR_MODE_MASK;
+		ctxt->el2_regs[SP_EL2] = ctxt->hw_sp_el1;
+	} else {
+		*vcpu_cpsr(vcpu) = ctxt->hw_pstate;
+		ctxt->gp_regs.sp_el1 = ctxt->hw_sp_el1;
+	}
 }
 
 void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt)
