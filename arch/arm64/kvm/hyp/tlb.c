@@ -17,13 +17,14 @@
 
 #include <asm/kvm_hyp.h>
 
-void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm_s2_mmu *mmu,
+					 phys_addr_t ipa)
 {
 	dsb(ishst);
 
 	/* Switch to requested VMID */
-	kvm = kern_hyp_va(kvm);
-	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+	mmu = kern_hyp_va(mmu);
+	write_sysreg(mmu->vttbr, vttbr_el2);
 	isb();
 
 	/*
@@ -48,13 +49,13 @@ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
 	write_sysreg(0, vttbr_el2);
 }
 
-void __hyp_text __kvm_tlb_flush_vmid(struct kvm *kvm)
+void __hyp_text __kvm_tlb_flush_vmid(struct kvm_s2_mmu *mmu)
 {
 	dsb(ishst);
 
 	/* Switch to requested VMID */
-	kvm = kern_hyp_va(kvm);
-	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+	mmu = kern_hyp_va(mmu);
+	write_sysreg(mmu->vttbr, vttbr_el2);
 	isb();
 
 	asm volatile("tlbi vmalls12e1is" : : );
@@ -64,12 +65,11 @@ void __hyp_text __kvm_tlb_flush_vmid(struct kvm *kvm)
 	write_sysreg(0, vttbr_el2);
 }
 
-void __hyp_text __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu)
+void __hyp_text __kvm_tlb_flush_local_vmid(struct kvm_s2_mmu *mmu)
 {
-	struct kvm *kvm = kern_hyp_va(kern_hyp_va(vcpu)->kvm);
-
 	/* Switch to requested VMID */
-	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+	mmu = kern_hyp_va(mmu);
+	write_sysreg(mmu->vttbr, vttbr_el2);
 	isb();
 
 	asm volatile("tlbi vmalle1" : : );

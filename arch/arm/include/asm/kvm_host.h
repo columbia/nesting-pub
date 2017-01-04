@@ -53,9 +53,21 @@ int __attribute_const__ kvm_target_cpu(void);
 int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
 void kvm_reset_coprocs(struct kvm_vcpu *vcpu);
 
-struct kvm_arch {
-	/* VTTBR value associated with below pgd and vmid */
+struct kvm_s2_mmu {
+	/* The VMID generation used for the virt. memory system */
+	u64    vmid_gen;
+	u32    vmid;
+
+	/* Stage-2 page table */
+	pgd_t *pgd;
+
+	/* VTTBR value associated with above pgd and vmid */
 	u64    vttbr;
+};
+
+struct kvm_arch {
+	/* Stage 2 paging state for the VM */
+	struct kvm_s2_mmu mmu;
 
 	/* The last vcpu id that ran on each physical CPU */
 	int __percpu *last_vcpu_ran;
@@ -67,13 +79,6 @@ struct kvm_arch {
 	 * Anything that is not used directly from assembly code goes
 	 * here.
 	 */
-
-	/* The VMID generation used for the virt. memory system */
-	u64    vmid_gen;
-	u32    vmid;
-
-	/* Stage-2 page table */
-	pgd_t *pgd;
 
 	/* Interrupt controller */
 	struct vgic_dist	vgic;
@@ -188,6 +193,9 @@ struct kvm_vcpu_arch {
 
 	/* Detect first run of a vcpu */
 	bool has_run_once;
+
+	/* Stage 2 paging state used by the hardware on next switch */
+	struct kvm_s2_mmu *hw_mmu;
 };
 
 struct kvm_vm_stat {
