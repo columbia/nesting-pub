@@ -91,7 +91,7 @@ static void create_shadow_el1_sysregs(struct kvm_vcpu *vcpu)
 
 static void setup_s2_mmu(struct kvm_vcpu *vcpu)
 {
-	struct kvm_s2_mmu *mmu = &vcpu->kvm->arch.mmu;
+	struct kvm_s2_mmu *mmu = vcpu_get_active_s2_mmu(vcpu);
 	struct kvm_s2_vmid *vmid = vcpu_get_active_vmid(vcpu);
 
 	vcpu->arch.hw_vttbr = kvm_get_vttbr(vmid, mmu);

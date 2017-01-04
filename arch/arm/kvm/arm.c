@@ -146,6 +146,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 	/* Mark the initial VMID generation invalid */
 	kvm->arch.mmu.vmid.vmid_gen = 0;
 	kvm->arch.mmu.el2_vmid.vmid_gen = 0;
+	INIT_LIST_HEAD(&kvm->arch.nested_mmu_list);
 
 	/* The maximum number of VCPUs is limited by the host's GIC model */
 	kvm->arch.max_vcpus = vgic_present ?

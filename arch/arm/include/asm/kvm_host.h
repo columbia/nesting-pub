@@ -82,6 +82,9 @@ struct kvm_arch {
 	 * here.
 	 */
 
+	/* Never used on arm but added to be compatible with arm64 */
+	struct list_head nested_mmu_list;
+
 	/* Interrupt controller */
 	struct vgic_dist	vgic;
 	int max_vcpus;

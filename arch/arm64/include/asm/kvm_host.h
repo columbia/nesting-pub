@@ -65,6 +65,22 @@ struct kvm_s2_mmu {
 	pgd_t *pgd;
 };
 
+/* Per nested VM mmu structure */
+struct kvm_nested_s2_mmu {
+	struct kvm_s2_mmu mmu;
+
+	/*
+	 * The vttbr value set by the guest hypervisor for this nested VM.
+	 * vmid field is used as a key to search for this mmu structure among
+	 * all nested VM mmu structures by the host hypervisor.
+	 * baddr field is used to determine if we need to unmap stage 2
+	 * shadow page tables.
+	 */
+	u64 virtual_vttbr;
+
+	struct list_head list;
+};
+
 struct kvm_arch {
 	/* Stage 2 paging state for the VM */
 	struct kvm_s2_mmu mmu;
@@ -80,6 +96,9 @@ struct kvm_arch {
 
 	/* Timer */
 	struct arch_timer_kvm	timer;
+
+	/* Stage 2 shadow paging contexts for nested L2 VM */
+	struct list_head nested_mmu_list;
 };
 
 #define KVM_NR_MEM_OBJS     40
