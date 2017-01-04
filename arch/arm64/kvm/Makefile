@@ -37,5 +37,6 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
 kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
 
 kvm-$(CONFIG_KVM_ARM_HOST) += nested.o
+kvm-$(CONFIG_KVM_ARM_HOST) += mmu-nested.o
 kvm-$(CONFIG_KVM_ARM_HOST) += emulate-nested.o
 kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v2-nested.o
