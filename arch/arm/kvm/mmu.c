@@ -20,7 +20,6 @@
 #include <linux/kvm_host.h>
 #include <linux/io.h>
 #include <linux/hugetlb.h>
-#include <linux/sched/signal.h>
 #include <trace/events/kvm.h>
 #include <asm/pgalloc.h>
 #include <asm/cacheflush.h>
@@ -293,29 +292,16 @@ static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
 	phys_addr_t addr = start, end = start + size;
 	phys_addr_t next;
 
-	assert_spin_locked(&kvm->mmu_lock);
 	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
 	do {
-		/*
-		 * Make sure the page table is still active, as another thread
-		 * could have possibly freed the page table, while we released
-		 * the lock.
-		 */
-		if (!READ_ONCE(kvm->arch.pgd))
-			break;
 		next = stage2_pgd_addr_end(addr, end);
 		if (!stage2_pgd_none(*pgd))
 			unmap_stage2_puds(kvm, pgd, addr, next);
-		/*
-		 * If the range is too large, release the kvm->mmu_lock
-		 * to prevent starvation and lockup detector warnings.
-		 */
-		if (next != end)
-			cond_resched_lock(&kvm->mmu_lock);
 	} while (pgd++, addr = next, addr != end);
 }
 
-static void stage2_flush_ptes(pmd_t *pmd, phys_addr_t addr, phys_addr_t end)
+static void stage2_flush_ptes(pmd_t *pmd,
+			      phys_addr_t addr, phys_addr_t end)
 {
 	pte_t *pte;
 
@@ -326,7 +312,8 @@ static void stage2_flush_ptes(pmd_t *pmd, phys_addr_t addr, phys_addr_t end)
 	} while (pte++, addr += PAGE_SIZE, addr != end);
 }
 
-static void stage2_flush_pmds(pud_t *pud, phys_addr_t addr, phys_addr_t end)
+static void stage2_flush_pmds(pud_t *pud,
+			      phys_addr_t addr, phys_addr_t end)
 {
 	pmd_t *pmd;
 	phys_addr_t next;
@@ -343,7 +330,8 @@ static void stage2_flush_pmds(pud_t *pud, phys_addr_t addr, phys_addr_t end)
 	} while (pmd++, addr = next, addr != end);
 }
 
-static void stage2_flush_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
+static void stage2_flush_puds(pgd_t *pgd,
+			      phys_addr_t addr, phys_addr_t end)
 {
 	pud_t *pud;
 	phys_addr_t next;
@@ -815,7 +803,6 @@ void stage2_unmap_vm(struct kvm *kvm)
 	int idx;
 
 	idx = srcu_read_lock(&kvm->srcu);
-	down_read(&current->mm->mmap_sem);
 	spin_lock(&kvm->mmu_lock);
 
 	slots = kvm_memslots(kvm);
@@ -823,7 +810,6 @@ void stage2_unmap_vm(struct kvm *kvm)
 		stage2_unmap_memslot(kvm, memslot);
 
 	spin_unlock(&kvm->mmu_lock);
-	up_read(&current->mm->mmap_sem);
 	srcu_read_unlock(&kvm->srcu, idx);
 }
 
@@ -834,22 +820,19 @@ void stage2_unmap_vm(struct kvm *kvm)
  * Walks the level-1 page table pointed to by kvm->arch.pgd and frees all
  * underlying level-2 and level-3 tables before freeing the actual level-1 table
  * and setting the struct pointer to NULL.
+ *
+ * Note we don't need locking here as this is only called when the VM is
+ * destroyed, which can only be done once.
  */
 void kvm_free_stage2_pgd(struct kvm *kvm)
 {
-	void *pgd = NULL;
+	if (kvm->arch.pgd == NULL)
+		return;
 
-	spin_lock(&kvm->mmu_lock);
-	if (kvm->arch.pgd) {
-		unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
-		pgd = READ_ONCE(kvm->arch.pgd);
-		kvm->arch.pgd = NULL;
-	}
-	spin_unlock(&kvm->mmu_lock);
-
+	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
 	/* Free the HW pgd, one page at a time */
-	if (pgd)
-		free_pages_exact(pgd, S2_PGD_SIZE);
+	free_pages_exact(kvm->arch.pgd, S2_PGD_SIZE);
+	kvm->arch.pgd = NULL;
 }
 
 static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
@@ -877,9 +860,6 @@ static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
 	pmd_t *pmd;
 
 	pud = stage2_get_pud(kvm, cache, addr);
-	if (!pud)
-		return NULL;
-
 	if (stage2_pud_none(*pud)) {
 		if (!cache)
 			return NULL;
@@ -1178,13 +1158,11 @@ static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
 		 * large. Otherwise, we may see kernel panics with
 		 * CONFIG_DETECT_HUNG_TASK, CONFIG_LOCKUP_DETECTOR,
 		 * CONFIG_LOCKDEP. Additionally, holding the lock too long
-		 * will also starve other vCPUs. We have to also make sure
-		 * that the page tables are not freed while we released
-		 * the lock.
+		 * will also starve other vCPUs.
 		 */
-		cond_resched_lock(&kvm->mmu_lock);
-		if (!READ_ONCE(kvm->arch.pgd))
-			break;
+		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
+			cond_resched_lock(&kvm->mmu_lock);
+
 		next = stage2_pgd_addr_end(addr, end);
 		if (stage2_pgd_present(*pgd))
 			stage2_wp_puds(pgd, addr, next);
@@ -1254,27 +1232,9 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
 }
 
 static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
-				      unsigned long size)
+				      unsigned long size, bool uncached)
 {
-	__coherent_cache_guest_page(vcpu, pfn, size);
-}
-
-static void kvm_send_hwpoison_signal(unsigned long address,
-				     struct vm_area_struct *vma)
-{
-	siginfo_t info;
-
-	info.si_signo   = SIGBUS;
-	info.si_errno   = 0;
-	info.si_code    = BUS_MCEERR_AR;
-	info.si_addr    = (void __user *)address;
-
-	if (is_vm_hugetlb_page(vma))
-		info.si_addr_lsb = huge_page_shift(hstate_vma(vma));
-	else
-		info.si_addr_lsb = PAGE_SHIFT;
-
-	send_sig_info(SIGBUS, &info, current);
+	__coherent_cache_guest_page(vcpu, pfn, size, uncached);
 }
 
 static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
@@ -1290,6 +1250,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	struct vm_area_struct *vma;
 	kvm_pfn_t pfn;
 	pgprot_t mem_type = PAGE_S2;
+	bool fault_ipa_uncached;
 	bool logging_active = memslot_is_logging(memslot);
 	unsigned long flags = 0;
 
@@ -1346,10 +1307,6 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	smp_rmb();
 
 	pfn = gfn_to_pfn_prot(kvm, gfn, write_fault, &writable);
-	if (pfn == KVM_PFN_ERR_HWPOISON) {
-		kvm_send_hwpoison_signal(hva, vma);
-		return 0;
-	}
 	if (is_error_noslot_pfn(pfn))
 		return -EFAULT;
 
@@ -1380,6 +1337,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	if (!hugetlb && !force_pte)
 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
 
+	fault_ipa_uncached = memslot->flags & KVM_MEMSLOT_INCOHERENT;
+
 	if (hugetlb) {
 		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
 		new_pmd = pmd_mkhuge(new_pmd);
@@ -1387,7 +1346,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
 			kvm_set_pfn_dirty(pfn);
 		}
-		coherent_cache_guest_page(vcpu, pfn, PMD_SIZE);
+		coherent_cache_guest_page(vcpu, pfn, PMD_SIZE, fault_ipa_uncached);
 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
 	} else {
 		pte_t new_pte = pfn_pte(pfn, mem_type);
@@ -1397,7 +1356,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 			kvm_set_pfn_dirty(pfn);
 			mark_page_dirty(kvm, gfn);
 		}
-		coherent_cache_guest_page(vcpu, pfn, PAGE_SIZE);
+		coherent_cache_guest_page(vcpu, pfn, PAGE_SIZE, fault_ipa_uncached);
 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
 	}
 
@@ -1556,8 +1515,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
 			     unsigned long start,
 			     unsigned long end,
 			     int (*handler)(struct kvm *kvm,
-					    gpa_t gpa, u64 size,
-					    void *data),
+					    gpa_t gpa, void *data),
 			     void *data)
 {
 	struct kvm_memslots *slots;
@@ -1569,7 +1527,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
 	/* we only care about the pages that the guest sees */
 	kvm_for_each_memslot(memslot, slots) {
 		unsigned long hva_start, hva_end;
-		gfn_t gpa;
+		gfn_t gfn, gfn_end;
 
 		hva_start = max(start, memslot->userspace_addr);
 		hva_end = min(end, memslot->userspace_addr +
@@ -1577,16 +1535,25 @@ static int handle_hva_to_gpa(struct kvm *kvm,
 		if (hva_start >= hva_end)
 			continue;
 
-		gpa = hva_to_gfn_memslot(hva_start, memslot) << PAGE_SHIFT;
-		ret |= handler(kvm, gpa, (u64)(hva_end - hva_start), data);
+		/*
+		 * {gfn(page) | page intersects with [hva_start, hva_end)} =
+		 * {gfn_start, gfn_start+1, ..., gfn_end-1}.
+		 */
+		gfn = hva_to_gfn_memslot(hva_start, memslot);
+		gfn_end = hva_to_gfn_memslot(hva_end + PAGE_SIZE - 1, memslot);
+
+		for (; gfn < gfn_end; ++gfn) {
+			gpa_t gpa = gfn << PAGE_SHIFT;
+			ret |= handler(kvm, gpa, data);
+		}
 	}
 
 	return ret;
 }
 
-static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
 {
-	unmap_stage2_range(kvm, gpa, size);
+	unmap_stage2_range(kvm, gpa, PAGE_SIZE);
 	return 0;
 }
 
@@ -1613,11 +1580,10 @@ int kvm_unmap_hva_range(struct kvm *kvm,
 	return 0;
 }
 
-static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
 {
 	pte_t *pte = (pte_t *)data;
 
-	WARN_ON(size != PAGE_SIZE);
 	/*
 	 * We can always call stage2_set_pte with KVM_S2PTE_FLAG_LOGGING_ACTIVE
 	 * flag clear because MMU notifiers will have unmapped a huge PMD before
@@ -1643,12 +1609,11 @@ void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
 	handle_hva_to_gpa(kvm, hva, end, &kvm_set_spte_handler, &stage2_pte);
 }
 
-static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
 {
 	pmd_t *pmd;
 	pte_t *pte;
 
-	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
 	pmd = stage2_get_pmd(kvm, NULL, gpa);
 	if (!pmd || pmd_none(*pmd))	/* Nothing there */
 		return 0;
@@ -1663,12 +1628,11 @@ static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
 	return stage2_ptep_test_and_clear_young(pte);
 }
 
-static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
+static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
 {
 	pmd_t *pmd;
 	pte_t *pte;
 
-	WARN_ON(size != PAGE_SIZE && size != PMD_SIZE);
 	pmd = stage2_get_pmd(kvm, NULL, gpa);
 	if (!pmd || pmd_none(*pmd))	/* Nothing there */
 		return 0;
@@ -1711,6 +1675,11 @@ phys_addr_t kvm_mmu_get_httbr(void)
 phys_addr_t kvm_get_idmap_vector(void)
 {
 	return hyp_idmap_vector;
+}
+
+phys_addr_t kvm_get_idmap_start(void)
+{
+	return hyp_idmap_start;
 }
 
 static int kvm_map_idmap_text(pgd_t *pgd)
@@ -1835,7 +1804,6 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
 	    (KVM_PHYS_SIZE >> PAGE_SHIFT))
 		return -EFAULT;
 
-	down_read(&current->mm->mmap_sem);
 	/*
 	 * A memory region could potentially cover multiple VMAs, and any holes
 	 * between them, so iterate over all of them to find out if we can map
@@ -1879,10 +1847,8 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
 			pa += vm_start - vma->vm_start;
 
 			/* IO region dirty page logging not allowed */
-			if (memslot->flags & KVM_MEM_LOG_DIRTY_PAGES) {
-				ret = -EINVAL;
-				goto out;
-			}
+			if (memslot->flags & KVM_MEM_LOG_DIRTY_PAGES)
+				return -EINVAL;
 
 			ret = kvm_phys_addr_ioremap(kvm, gpa, pa,
 						    vm_end - vm_start,
@@ -1894,7 +1860,7 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
 	} while (hva < reg_end);
 
 	if (change == KVM_MR_FLAGS_ONLY)
-		goto out;
+		return ret;
 
 	spin_lock(&kvm->mmu_lock);
 	if (ret)
@@ -1902,8 +1868,6 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
 	else
 		stage2_flush_memslot(kvm, memslot);
 	spin_unlock(&kvm->mmu_lock);
-out:
-	up_read(&current->mm->mmap_sem);
 	return ret;
 }
 
@@ -1915,6 +1879,15 @@ void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
 int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
 			    unsigned long npages)
 {
+	/*
+	 * Readonly memslots are not incoherent with the caches by definition,
+	 * but in practice, they are used mostly to emulate ROMs or NOR flashes
+	 * that the guest may consider devices and hence map as uncached.
+	 * To prevent incoherency issues in these cases, tag all readonly
+	 * regions as incoherent.
+	 */
+	if (slot->flags & KVM_MEM_READONLY)
+		slot->flags |= KVM_MEMSLOT_INCOHERENT;
 	return 0;
 }
 
