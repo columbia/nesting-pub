@@ -230,6 +230,13 @@ static inline unsigned int kvm_get_vmid_bits(void)
 	return 8;
 }
 
+static inline void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu) { }
+static inline int kvm_nested_s2_init(struct kvm_vcpu *vcpu) { return 0; }
+static inline void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu) { }
+static inline void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm) { }
+static inline void kvm_nested_s2_all_vcpus_unmap(struct kvm *kvm) { }
+static inline void kvm_nested_s2_all_vcpus_flush(struct kvm *kvm) { }
+
 static inline u64 kvm_get_vttbr(struct kvm_s2_vmid *vmid,
 				struct kvm_s2_mmu *mmu)
 {

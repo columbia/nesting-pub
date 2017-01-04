@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2016 - Columbia University
  * Author: Jintack Lim <jintack@cs.columbia.edu>
+ * Author: Christoffer Dall <cdall@cs.columbia.edu>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -21,6 +22,86 @@
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_mmu.h>
 #include <asm/kvm_nested.h>
+
+
+/* expects kvm->mmu_lock to be held */
+void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm)
+{
+	int i;
+	struct kvm_vcpu *vcpu;
+	struct kvm_nested_s2_mmu *nested_mmu;
+	struct list_head *nested_mmu_list;
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
+			cond_resched_lock(&kvm->mmu_lock);
+
+		nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
+		list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
+			kvm_stage2_wp_range(kvm, &nested_mmu->mmu,
+				    0, KVM_PHYS_SIZE);
+	}
+}
+
+/* expects kvm->mmu_lock to be held */
+void kvm_nested_s2_all_vcpus_unmap(struct kvm *kvm)
+{
+	int i;
+	struct kvm_vcpu *vcpu;
+	struct kvm_nested_s2_mmu *nested_mmu;
+	struct list_head *nested_mmu_list;
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
+			cond_resched_lock(&kvm->mmu_lock);
+
+		nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
+		list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
+			kvm_unmap_stage2_range(&nested_mmu->mmu,
+				       0, KVM_PHYS_SIZE);
+	}
+}
+
+void kvm_nested_s2_all_vcpus_flush(struct kvm *kvm)
+{
+	int i;
+	struct kvm_vcpu *vcpu;
+	struct kvm_nested_s2_mmu *nested_mmu;
+	struct list_head *nested_mmu_list;
+
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
+			cond_resched_lock(&kvm->mmu_lock);
+
+		nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
+		list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
+			kvm_stage2_flush_range(&nested_mmu->mmu,
+				       0, KVM_PHYS_SIZE);
+	}
+}
+
+void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu)
+{
+	struct kvm_nested_s2_mmu *nested_mmu;
+	struct list_head *nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
+
+	list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
+		kvm_unmap_stage2_range(&nested_mmu->mmu, 0, KVM_PHYS_SIZE);
+}
+
+int kvm_nested_s2_init(struct kvm_vcpu *vcpu)
+{
+	return 0;
+}
+
+void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu)
+{
+	struct kvm_nested_s2_mmu *nested_mmu;
+	struct list_head *nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
+
+	list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
+		__kvm_free_stage2_pgd(&nested_mmu->mmu);
+}
 
 struct kvm_nested_s2_mmu *get_nested_mmu(struct kvm_vcpu *vcpu, u64 vttbr)
 {
@@ -87,15 +168,6 @@ static struct kvm_nested_s2_mmu *create_nested_mmu(struct kvm_vcpu *vcpu,
 	}
 
 	return nested_mmu;
-}
-
-static void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu)
-{
-	struct kvm_nested_s2_mmu *nested_mmu;
-	struct list_head *nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
-
-	list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
-		kvm_unmap_stage2_range(&nested_mmu->mmu, 0, KVM_PHYS_SIZE);
 }
 
 bool handle_vttbr_update(struct kvm_vcpu *vcpu, u64 vttbr)

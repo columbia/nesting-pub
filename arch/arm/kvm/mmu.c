@@ -416,6 +416,8 @@ static void stage2_flush_vm(struct kvm *kvm)
 	kvm_for_each_memslot(memslot, slots)
 		stage2_flush_memslot(&kvm->arch.mmu, memslot);
 
+	kvm_nested_s2_all_vcpus_flush(kvm);
+
 	spin_unlock(&kvm->mmu_lock);
 	srcu_read_unlock(&kvm->srcu, idx);
 }
@@ -1240,6 +1242,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot)
 
 	spin_lock(&kvm->mmu_lock);
 	kvm_stage2_wp_range(kvm, &kvm->arch.mmu, start, end);
+	kvm_nested_s2_all_vcpus_wp(kvm);
 	spin_unlock(&kvm->mmu_lock);
 	kvm_flush_remote_tlbs(kvm);
 }
@@ -1278,6 +1281,7 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
 		gfn_t gfn_offset, unsigned long mask)
 {
 	kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, mask);
+	kvm_nested_s2_all_vcpus_wp(kvm);
 }
 
 static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
@@ -1604,6 +1608,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
 static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
 {
 	kvm_unmap_stage2_range(&kvm->arch.mmu, gpa, PAGE_SIZE);
+	kvm_nested_s2_all_vcpus_unmap(kvm);
 	return 0;
 }
 
@@ -1642,6 +1647,7 @@ static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
 	 * through this calling path.
 	 */
 	stage2_set_pte(&kvm->arch.mmu, NULL, gpa, pte, 0);
+	kvm_nested_s2_all_vcpus_unmap(kvm);
 	return 0;
 }
 
@@ -1675,6 +1681,8 @@ static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
 	if (pte_none(*pte))
 		return 0;
 
+	/* TODO: Handle nested_mmu structures here as well */
+
 	return stage2_ptep_test_and_clear_young(pte);
 }
 
@@ -1693,6 +1701,8 @@ static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
 	pte = pte_offset_kernel(pmd, gpa);
 	if (!pte_none(*pte))		/* Just a page... */
 		return pte_young(*pte);
+
+	/* TODO: Handle nested_mmu structures here as well */
 
 	return 0;
 }
@@ -1959,6 +1969,7 @@ void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
 
 	spin_lock(&kvm->mmu_lock);
 	kvm_unmap_stage2_range(&kvm->arch.mmu, gpa, size);
+	kvm_nested_s2_all_vcpus_unmap(kvm);
 	spin_unlock(&kvm->mmu_lock);
 }
 

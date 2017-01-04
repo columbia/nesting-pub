@@ -328,6 +328,12 @@ static inline unsigned int kvm_get_vmid_bits(void)
 struct kvm_nested_s2_mmu *get_nested_mmu(struct kvm_vcpu *vcpu, u64 vttbr);
 struct kvm_s2_mmu *vcpu_get_active_s2_mmu(struct kvm_vcpu *vcpu);
 bool handle_vttbr_update(struct kvm_vcpu *vcpu, u64 vttbr);
+void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu);
+int kvm_nested_s2_init(struct kvm_vcpu *vcpu);
+void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu);
+void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm);
+void kvm_nested_s2_all_vcpus_unmap(struct kvm *kvm);
+void kvm_nested_s2_all_vcpus_flush(struct kvm *kvm);
 #else
 static inline struct kvm_nested_s2_mmu *get_nested_mmu(struct kvm_vcpu *vcpu,
 						       u64 vttbr)
@@ -343,6 +349,13 @@ static inline bool handle_vttbr_update(struct kvm_vcpu *vcpu, u64 vttbr)
 {
 	return false;
 }
+
+static inline void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu) { }
+static inline int kvm_nested_s2_init(struct kvm_vcpu *vcpu) { return 0; }
+static inline void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu) { }
+static inline void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm) { }
+static inline void kvm_nested_s2_all_vcpus_unmap(struct kvm *kvm) { }
+static inline void kvm_nested_s2_all_vcpus_flush(struct kvm *kvm) { }
 #endif
 
 static inline u64 kvm_get_vttbr(struct kvm_s2_vmid *vmid,

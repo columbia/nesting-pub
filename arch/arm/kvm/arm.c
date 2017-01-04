@@ -191,6 +191,7 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
 
 	for (i = 0; i < KVM_MAX_VCPUS; ++i) {
 		if (kvm->vcpus[i]) {
+			kvm_nested_s2_teardown(kvm->vcpus[i]);
 			kvm_arch_vcpu_free(kvm->vcpus[i]);
 			kvm->vcpus[i] = NULL;
 		}
@@ -333,6 +334,7 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 
 	vcpu->arch.hw_mmu = mmu;
 	vcpu->arch.hw_vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
+	kvm_nested_s2_init(vcpu);
 
 	return 0;
 }
@@ -871,8 +873,10 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
 	 * Ensure a rebooted VM will fault in RAM pages and detect if the
 	 * guest MMU is turned off and flush the caches as needed.
 	 */
-	if (vcpu->arch.has_run_once)
+	if (vcpu->arch.has_run_once) {
 		stage2_unmap_vm(vcpu->kvm);
+		kvm_nested_s2_unmap(vcpu);
+	}
 
 	vcpu_reset_hcr(vcpu);
 
