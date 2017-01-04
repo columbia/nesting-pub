@@ -307,7 +307,7 @@ static void unmap_stage2_puds(struct kvm_s2_mmu *mmu, pgd_t *pgd,
 }
 
 /**
- * unmap_stage2_range -- Clear stage2 page table entries to unmap a range
+ * kvm_unmap_stage2_range -- Clear stage2 page table entries to unmap a range
  * @kvm:   The VM pointer
  * @start: The intermediate physical base address of the range to unmap
  * @size:  The size of the area to unmap
@@ -317,12 +317,12 @@ static void unmap_stage2_puds(struct kvm_s2_mmu *mmu, pgd_t *pgd,
  * destroying the VM), otherwise another faulting VCPU may come in and mess
  * with things behind our backs.
  */
-static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+void kvm_unmap_stage2_range(struct kvm *kvm, struct kvm_s2_mmu *mmu,
+			    phys_addr_t start, u64 size)
 {
 	pgd_t *pgd;
 	phys_addr_t addr = start, end = start + size;
 	phys_addr_t next;
-	struct kvm_s2_mmu *mmu = &kvm->arch.mmu;
 
 	assert_spin_locked(&kvm->mmu_lock);
 	pgd = mmu->pgd + stage2_pgd_index(addr);
@@ -391,11 +391,10 @@ static void stage2_flush_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
 	} while (pud++, addr = next, addr != end);
 }
 
-static void stage2_flush_memslot(struct kvm_s2_mmu *mmu,
-				 struct kvm_memory_slot *memslot)
+void kvm_stage2_flush_range(struct kvm_s2_mmu *mmu,
+			    phys_addr_t start, phys_addr_t end)
 {
-	phys_addr_t addr = memslot->base_gfn << PAGE_SHIFT;
-	phys_addr_t end = addr + PAGE_SIZE * memslot->npages;
+	phys_addr_t addr = start;
 	phys_addr_t next;
 	pgd_t *pgd;
 
@@ -404,6 +403,15 @@ static void stage2_flush_memslot(struct kvm_s2_mmu *mmu,
 		next = stage2_pgd_addr_end(addr, end);
 		stage2_flush_puds(pgd, addr, next);
 	} while (pgd++, addr = next, addr != end);
+}
+
+static void stage2_flush_memslot(struct kvm_s2_mmu *mmu,
+		struct kvm_memory_slot *memslot)
+{
+	phys_addr_t start = memslot->base_gfn << PAGE_SHIFT;
+	phys_addr_t end = start + PAGE_SIZE * memslot->npages;
+
+	kvm_stage2_flush_range(mmu, start, end);
 }
 
 /**
@@ -762,21 +770,9 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
 				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
 }
 
-/**
- * kvm_alloc_stage2_pgd - allocate level-1 table for stage-2 translation.
- * @kvm:	The KVM struct pointer for the VM.
- *
- * Allocates only the stage-2 HW PGD level table(s) (can support either full
- * 40-bit input addresses or limited to 32-bit input addresses). Clears the
- * allocated pages.
- *
- * Note we don't need locking here as this is only called when the VM is
- * created, which can only be done once.
- */
-int kvm_alloc_stage2_pgd(struct kvm *kvm)
+int __kvm_alloc_stage2_pgd(struct kvm_s2_mmu *mmu)
 {
 	pgd_t *pgd;
-	struct kvm_s2_mmu *mmu = &kvm->arch.mmu;
 
 	if (mmu->pgd != NULL) {
 		kvm_err("kvm_arch already initialized?\n");
@@ -791,6 +787,22 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
 	mmu->pgd = pgd;
 
 	return 0;
+}
+
+/**
+ * kvm_alloc_stage2_pgd - allocate level-1 table for stage-2 translation.
+ * @kvm:	The KVM struct pointer for the VM.
+ *
+ * Allocates only the stage-2 HW PGD level table(s) (can support either full
+ * 40-bit input addresses or limited to 32-bit input addresses). Clears the
+ * allocated pages.
+ *
+ * Note we don't need locking here as this is only called when the VM is
+ * created, which can only be done once.
+ */
+int kvm_alloc_stage2_pgd(struct kvm *kvm)
+{
+	return __kvm_alloc_stage2_pgd(&kvm->arch.mmu);
 }
 
 static void stage2_unmap_memslot(struct kvm *kvm,
@@ -828,7 +840,8 @@ static void stage2_unmap_memslot(struct kvm *kvm,
 
 		if (!(vma->vm_flags & VM_PFNMAP)) {
 			gpa_t gpa = addr + (vm_start - memslot->userspace_addr);
-			unmap_stage2_range(kvm, gpa, vm_end - vm_start);
+			kvm_unmap_stage2_range(kvm, &kvm->arch.mmu, gpa,
+					       vm_end - vm_start);
 		}
 		hva = vm_end;
 	} while (hva < reg_end);
@@ -860,6 +873,22 @@ void stage2_unmap_vm(struct kvm *kvm)
 	srcu_read_unlock(&kvm->srcu, idx);
 }
 
+void __kvm_free_stage2_pgd(struct kvm *kvm, struct kvm_s2_mmu *mmu)
+{
+	void *pgd = NULL;
+
+	spin_lock(&kvm->mmu_lock);
+	if (mmu->pgd) {
+		kvm_unmap_stage2_range(kvm, mmu, 0, KVM_PHYS_SIZE);
+		pgd = READ_ONCE(mmu->pgd);
+		mmu->pgd = NULL;
+	}
+	spin_unlock(&kvm->mmu_lock);
+
+	/* Free the HW pgd, one page at a time */
+	if (pgd)
+		free_pages_exact(pgd, S2_PGD_SIZE);
+}
 /**
  * kvm_free_stage2_pgd - free all stage-2 tables
  * @kvm:	The KVM struct pointer for the VM.
@@ -870,20 +899,7 @@ void stage2_unmap_vm(struct kvm *kvm)
  */
 void kvm_free_stage2_pgd(struct kvm *kvm)
 {
-	void *pgd = NULL;
-	struct kvm_s2_mmu *mmu = &kvm->arch.mmu;
-
-	spin_lock(&kvm->mmu_lock);
-	if (mmu->pgd) {
-		unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
-		pgd = READ_ONCE(mmu->pgd);
-		mmu->pgd = NULL;
-	}
-	spin_unlock(&kvm->mmu_lock);
-
-	/* Free the HW pgd, one page at a time */
-	if (pgd)
-		free_pages_exact(pgd, S2_PGD_SIZE);
+	__kvm_free_stage2_pgd(kvm, &kvm->arch.mmu);
 }
 
 static pud_t *stage2_get_pud(struct kvm_s2_mmu *mmu,
@@ -1204,7 +1220,7 @@ static void  stage2_wp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
  * @addr:	Start address of range
  * @end:	End address of range
  */
-static void stage2_wp_range(struct kvm *kvm, struct kvm_s2_mmu *mmu,
+void kvm_stage2_wp_range(struct kvm *kvm, struct kvm_s2_mmu *mmu,
 			    phys_addr_t addr, phys_addr_t end)
 {
 	pgd_t *pgd;
@@ -1251,7 +1267,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot)
 	phys_addr_t end = (memslot->base_gfn + memslot->npages) << PAGE_SHIFT;
 
 	spin_lock(&kvm->mmu_lock);
-	stage2_wp_range(kvm, &kvm->arch.mmu, start, end);
+	kvm_stage2_wp_range(kvm, &kvm->arch.mmu, start, end);
 	spin_unlock(&kvm->mmu_lock);
 	kvm_flush_remote_tlbs(kvm);
 }
@@ -1275,7 +1291,7 @@ static void kvm_mmu_write_protect_pt_masked(struct kvm *kvm,
 	phys_addr_t start = (base_gfn +  __ffs(mask)) << PAGE_SHIFT;
 	phys_addr_t end = (base_gfn + __fls(mask) + 1) << PAGE_SHIFT;
 
-	stage2_wp_range(kvm, &kvm->arch.mmu, start, end);
+	kvm_stage2_wp_range(kvm, &kvm->arch.mmu, start, end);
 }
 
 /*
@@ -1626,7 +1642,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
 
 static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data)
 {
-	unmap_stage2_range(kvm, gpa, size);
+	kvm_unmap_stage2_range(kvm, &kvm->arch.mmu, gpa, size);
 	return 0;
 }
 
@@ -1938,8 +1954,8 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
 
 	spin_lock(&kvm->mmu_lock);
 	if (ret)
-		unmap_stage2_range(kvm, mem->guest_phys_addr,
-				   mem->memory_size);
+		kvm_unmap_stage2_range(kvm, &kvm->arch.mmu,
+				       mem->guest_phys_addr, mem->memory_size);
 	else
 		stage2_flush_memslot(&kvm->arch.mmu, memslot);
 	spin_unlock(&kvm->mmu_lock);
@@ -1975,7 +1991,7 @@ void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
 	phys_addr_t size = slot->npages << PAGE_SHIFT;
 
 	spin_lock(&kvm->mmu_lock);
-	unmap_stage2_range(kvm, gpa, size);
+	kvm_unmap_stage2_range(kvm, &kvm->arch.mmu, gpa, size);
 	spin_unlock(&kvm->mmu_lock);
 }
 
