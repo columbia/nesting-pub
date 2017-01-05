@@ -314,5 +314,16 @@ static inline unsigned int kvm_get_vmid_bits(void)
 	return (cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
 }
 
+static inline u64 kvm_get_vttbr(struct kvm_s2_vmid *vmid,
+				struct kvm_s2_mmu *mmu)
+{
+	u64 vmid_field, baddr;
+
+	baddr = virt_to_phys(mmu->pgd);
+	vmid_field = ((u64)vmid->vmid << VTTBR_VMID_SHIFT) &
+		VTTBR_VMID_MASK(get_kvm_vmid_bits());
+	return baddr | vmid_field;
+}
+
 #endif /* __ASSEMBLY__ */
 #endif /* __ARM64_KVM_MMU_H__ */

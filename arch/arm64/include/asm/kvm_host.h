@@ -50,17 +50,19 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
 int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext);
 void __extended_idmap_trampoline(phys_addr_t boot_pgd, phys_addr_t idmap_start);
 
-struct kvm_s2_mmu {
+struct kvm_s2_vmid {
 	/* The VMID generation used for the virt. memory system */
 	u64    vmid_gen;
 	u32    vmid;
+};
+
+struct kvm_s2_mmu {
+	struct kvm_s2_vmid vmid;
+	struct kvm_s2_vmid el2_vmid;
 
 	/* 1-level 2nd stage table and lock */
 	spinlock_t pgd_lock;
 	pgd_t *pgd;
-
-	/* VTTBR value associated with above pgd and vmid */
-	u64    vttbr;
 };
 
 struct kvm_arch {
@@ -334,6 +336,9 @@ struct kvm_vcpu_arch {
 
 	/* Stage 2 paging state used by the hardware on next switch */
 	struct kvm_s2_mmu *hw_mmu;
+
+	/* VTTBR value used by the hardware on next switch */
+	u64 hw_vttbr;
 };
 
 #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
@@ -391,6 +396,7 @@ static inline void kvm_arch_mmu_notifier_invalidate_page(struct kvm *kvm,
 {
 }
 
+unsigned int get_kvm_vmid_bits(void);
 struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
 struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
 void kvm_arm_halt_guest(struct kvm *kvm);

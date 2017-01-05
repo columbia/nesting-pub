@@ -75,6 +75,11 @@ static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
 	__this_cpu_write(kvm_arm_running_vcpu, vcpu);
 }
 
+unsigned int get_kvm_vmid_bits(void)
+{
+	return kvm_vmid_bits;
+}
+
 /**
  * kvm_arm_get_running_vcpu - get the vcpu running on the current CPU.
  * Must be called from non-preemptible context
@@ -139,7 +144,8 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 	kvm_timer_init(kvm);
 
 	/* Mark the initial VMID generation invalid */
-	kvm->arch.mmu.vmid_gen = 0;
+	kvm->arch.mmu.vmid.vmid_gen = 0;
+	kvm->arch.mmu.el2_vmid.vmid_gen = 0;
 
 	/* The maximum number of VCPUs is limited by the host's GIC model */
 	kvm->arch.max_vcpus = vgic_present ?
@@ -312,6 +318,8 @@ void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu)
 
 int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 {
+	struct kvm_s2_mmu *mmu = &vcpu->kvm->arch.mmu;
+
 	/* Force users to call KVM_ARM_VCPU_INIT */
 	vcpu->arch.target = -1;
 	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
@@ -321,7 +329,8 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 
 	kvm_arm_reset_debug_ptr(vcpu);
 
-	vcpu->arch.hw_mmu = &vcpu->kvm->arch.mmu;
+	vcpu->arch.hw_mmu = mmu;
+	vcpu->arch.hw_vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
 
 	return 0;
 }
@@ -337,7 +346,10 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	 * over-invalidation doesn't affect correctness.
 	 */
 	if (*last_ran != vcpu->vcpu_id) {
-		kvm_call_hyp(__kvm_tlb_flush_local_vmid, &vcpu->kvm->arch.mmu);
+		struct kvm_s2_mmu *mmu = &vcpu->kvm->arch.mmu;
+		u64 vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
+
+		kvm_call_hyp(__kvm_tlb_flush_local_vmid, vttbr);
 		*last_ran = vcpu->vcpu_id;
 	}
 
@@ -415,36 +427,33 @@ void force_vm_exit(const cpumask_t *mask)
 
 /**
  * need_new_vmid_gen - check that the VMID is still valid
- * @kvm: The VM's VMID to check
+ * @vmid: The VMID to check
  *
  * return true if there is a new generation of VMIDs being used
  *
- * The hardware supports only 256 values with the value zero reserved for the
- * host, so we check if an assigned value belongs to a previous generation,
- * which which requires us to assign a new value. If we're the first to use a
- * VMID for the new generation, we must flush necessary caches and TLBs on all
- * CPUs.
+ * The hardware supports a limited set of values with the value zero reserved
+ * for the host, so we check if an assigned value belongs to a previous
+ * generation, which which requires us to assign a new value. If we're the
+ * first to use a VMID for the new generation, we must flush necessary caches
+ * and TLBs on all CPUs.
  */
-static bool need_new_vmid_gen(struct kvm_s2_mmu *mmu)
+static bool need_new_vmid_gen(struct kvm_s2_vmid *vmid)
 {
-	return unlikely(mmu->vmid_gen != atomic64_read(&kvm_vmid_gen));
+	return unlikely(vmid->vmid_gen != atomic64_read(&kvm_vmid_gen));
 }
 
 /**
  * update_vttbr - Update the VTTBR with a valid VMID before the guest runs
  * @kvm:	The guest that we are about to run
- * @mmu:	The stage-2 translation context to update
+ * @vmid:	The stage-2 VMID information struct
  *
  * Called from kvm_arch_vcpu_ioctl_run before entering the guest to ensure the
  * VM has a valid VMID, otherwise assigns a new one and flushes corresponding
  * caches and TLBs.
  */
-static void update_vttbr(struct kvm *kvm, struct kvm_s2_mmu *mmu)
+static void update_vttbr(struct kvm *kvm, struct kvm_s2_vmid *vmid)
 {
-	phys_addr_t pgd_phys;
-	u64 vmid;
-
-	if (!need_new_vmid_gen(mmu))
+	if (!need_new_vmid_gen(vmid))
 		return;
 
 	spin_lock(&kvm_vmid_lock);
@@ -454,7 +463,7 @@ static void update_vttbr(struct kvm *kvm, struct kvm_s2_mmu *mmu)
 	 * already allocated a valid vmid for this vm, then this vcpu should
 	 * use the same vmid.
 	 */
-	if (!need_new_vmid_gen(mmu)) {
+	if (!need_new_vmid_gen(vmid)) {
 		spin_unlock(&kvm_vmid_lock);
 		return;
 	}
@@ -478,17 +487,10 @@ static void update_vttbr(struct kvm *kvm, struct kvm_s2_mmu *mmu)
 		kvm_call_hyp(__kvm_flush_vm_context);
 	}
 
-	mmu->vmid_gen = atomic64_read(&kvm_vmid_gen);
-	mmu->vmid = kvm_next_vmid;
+	vmid->vmid_gen = atomic64_read(&kvm_vmid_gen);
+	vmid->vmid = kvm_next_vmid;
 	kvm_next_vmid++;
 	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
-
-	/* update vttbr to be used with the new vmid */
-	pgd_phys = virt_to_phys(mmu->pgd);
-	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
-	vmid = ((u64)(mmu->vmid) << VTTBR_VMID_SHIFT) &
-	       VTTBR_VMID_MASK(kvm_vmid_bits);
-	mmu->vttbr = pgd_phys | vmid;
 
 	spin_unlock(&kvm_vmid_lock);
 }
@@ -615,7 +617,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 		 */
 		cond_resched();
 
-		update_vttbr(vcpu->kvm, vcpu->arch.hw_mmu);
+		update_vttbr(vcpu->kvm, vcpu_get_active_vmid(vcpu));
 
 		if (vcpu->arch.power_off || vcpu->arch.pause)
 			vcpu_sleep(vcpu);
@@ -640,7 +642,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 			run->exit_reason = KVM_EXIT_INTR;
 		}
 
-		if (ret <= 0 || need_new_vmid_gen(vcpu->arch.hw_mmu) ||
+		if (ret <= 0 || need_new_vmid_gen(vcpu_get_active_vmid(vcpu)) ||
 			vcpu->arch.power_off || vcpu->arch.pause) {
 			local_irq_enable();
 			kvm_pmu_sync_hwstate(vcpu);

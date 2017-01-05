@@ -73,9 +73,7 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
 
 static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
 {
-	struct kvm_s2_mmu *mmu = kern_hyp_va(vcpu->arch.hw_mmu);
-
-	write_sysreg(mmu->vttbr, VTTBR);
+	write_sysreg(vcpu->arch.hw_vttbr, VTTBR);
 	write_sysreg(vcpu->arch.midr, VPIDR);
 }
 

@@ -60,12 +60,17 @@ static bool memslot_is_logging(struct kvm_memory_slot *memslot)
  */
 void kvm_flush_remote_tlbs(struct kvm *kvm)
 {
-	kvm_call_hyp(__kvm_tlb_flush_vmid, kvm);
+	struct kvm_s2_mmu *mmu = &kvm->arch.mmu;
+	u64 vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
+
+	kvm_call_hyp(__kvm_tlb_flush_vmid, vttbr);
 }
 
 static void kvm_tlb_flush_vmid_ipa(struct kvm_s2_mmu *mmu, phys_addr_t ipa)
 {
-	kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, mmu, ipa);
+	u64 vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
+
+	kvm_call_hyp(__kvm_tlb_flush_vmid_ipa, vttbr, ipa);
 }
 
 /*

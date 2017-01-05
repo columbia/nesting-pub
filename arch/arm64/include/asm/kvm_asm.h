@@ -53,9 +53,9 @@ extern char __kvm_hyp_reset[];
 extern char __kvm_hyp_vector[];
 
 extern void __kvm_flush_vm_context(void);
-extern void __kvm_tlb_flush_vmid_ipa(struct kvm_s2_mmu *mmu, phys_addr_t ipa);
-extern void __kvm_tlb_flush_vmid(struct kvm_s2_mmu *mmu);
-extern void __kvm_tlb_flush_local_vmid(struct kvm_s2_mmu *mmu);
+extern void __kvm_tlb_flush_vmid_ipa(u64 vttbr, phys_addr_t ipa);
+extern void __kvm_tlb_flush_vmid(u64 vttbr);
+extern void __kvm_tlb_flush_local_vmid(u64 vttbr);
 
 extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
 
