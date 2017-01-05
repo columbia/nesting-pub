@@ -18,7 +18,7 @@
 #include <asm/kvm_hyp.h>
 #include <asm/tlbflush.h>
 
-static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm_s2_mmu *mmu)
+static void __hyp_text __tlb_switch_to_guest_vhe(u64 vttbr)
 {
 	u64 val;
 
@@ -29,16 +29,16 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm_s2_mmu *mmu)
 	 * bits. Changing E2H is impossible (goodbye TTBR1_EL2), so
 	 * let's flip TGE before executing the TLB operation.
 	 */
-	write_sysreg(mmu->vttbr, vttbr_el2);
+	write_sysreg(vttbr, vttbr_el2);
 	val = read_sysreg(hcr_el2);
 	val &= ~HCR_TGE;
 	write_sysreg(val, hcr_el2);
 	isb();
 }
 
-static void __hyp_text __tlb_switch_to_guest_nvhe(struct kvm_s2_mmu *mmu)
+static void __hyp_text __tlb_switch_to_guest_nvhe(u64 vttbr)
 {
-	write_sysreg(mmu->vttbr, vttbr_el2);
+	write_sysreg(vttbr, vttbr_el2);
 	isb();
 }
 
@@ -47,7 +47,7 @@ static hyp_alternate_select(__tlb_switch_to_guest,
 			    __tlb_switch_to_guest_vhe,
 			    ARM64_HAS_VIRT_HOST_EXTN);
 
-static void __hyp_text __tlb_switch_to_host_vhe(struct kvm_s2_mmu *mmu)
+static void __hyp_text __tlb_switch_to_host_vhe(void)
 {
 	/*
 	 * We're done with the TLB operation, let's restore the host's
@@ -57,7 +57,7 @@ static void __hyp_text __tlb_switch_to_host_vhe(struct kvm_s2_mmu *mmu)
 	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
 }
 
-static void __hyp_text __tlb_switch_to_host_nvhe(struct kvm_s2_mmu *mmu)
+static void __hyp_text __tlb_switch_to_host_nvhe(void)
 {
 	write_sysreg(0, vttbr_el2);
 }
@@ -67,14 +67,12 @@ static hyp_alternate_select(__tlb_switch_to_host,
 			    __tlb_switch_to_host_vhe,
 			    ARM64_HAS_VIRT_HOST_EXTN);
 
-void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm_s2_mmu *mmu,
-					 phys_addr_t ipa)
+void __hyp_text __kvm_tlb_flush_vmid_ipa(u64 vttbr, phys_addr_t ipa)
 {
 	dsb(ishst);
 
 	/* Switch to requested VMID */
-	mmu = kern_hyp_va(mmu);
-	__tlb_switch_to_guest()(mmu);
+	__tlb_switch_to_guest()(vttbr);
 
 	/*
 	 * We could do so much better if we had the VA as well.
@@ -117,35 +115,33 @@ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm_s2_mmu *mmu,
 	if (!has_vhe() && icache_is_vpipt())
 		__flush_icache_all();
 
-	__tlb_switch_to_host()(mmu);
+	__tlb_switch_to_host()();
 }
 
-void __hyp_text __kvm_tlb_flush_vmid(struct kvm_s2_mmu *mmu)
+void __hyp_text __kvm_tlb_flush_vmid(u64 vttbr)
 {
 	dsb(ishst);
 
 	/* Switch to requested VMID */
-	mmu = kern_hyp_va(mmu);
-	__tlb_switch_to_guest()(mmu);
+	__tlb_switch_to_guest()(vttbr);
 
 	__tlbi(vmalls12e1is);
 	dsb(ish);
 	isb();
 
-	__tlb_switch_to_host()(mmu);
+	__tlb_switch_to_host()();
 }
 
-void __hyp_text __kvm_tlb_flush_local_vmid(struct kvm_s2_mmu *mmu)
+void __hyp_text __kvm_tlb_flush_local_vmid(u64 vttbr)
 {
 	/* Switch to requested VMID */
-	mmu = kern_hyp_va(mmu);
-	__tlb_switch_to_guest()(mmu);
+	__tlb_switch_to_guest()(vttbr);
 
 	__tlbi(vmalle1);
 	dsb(nsh);
 	isb();
 
-	__tlb_switch_to_host()(mmu);
+	__tlb_switch_to_host()();
 }
 
 void __hyp_text __kvm_flush_vm_context(void)
