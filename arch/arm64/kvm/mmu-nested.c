@@ -23,6 +23,229 @@
 #include <asm/kvm_mmu.h>
 #include <asm/kvm_nested.h>
 
+struct s2_walk_info {
+	unsigned int pgshift;
+	unsigned int pgsize;
+	unsigned int ps;
+	unsigned int sl;
+	unsigned int t0sz;
+};
+
+static unsigned int ps_to_output_size(unsigned int ps)
+{
+	switch (ps) {
+	case 0: return 32;
+	case 1: return 36;
+	case 2: return 40;
+	case 3: return 42;
+	case 4: return 44;
+	case 5:
+	default:
+		return 48;
+	}
+}
+
+static unsigned int pa_max(void)
+{
+	u64 parange = read_sysreg(id_aa64mmfr0_el1) & 7;
+
+	return ps_to_output_size(parange);
+}
+
+static int vcpu_inject_s2_trans_fault(struct kvm_vcpu *vcpu, gpa_t ipa,
+				      int level)
+{
+	/* TODO: Implement */
+	return -EFAULT;
+}
+
+static int vcpu_inject_s2_addr_sz_fault(struct kvm_vcpu *vcpu, gpa_t ipa,
+					int level)
+{
+	/* TODO: Implement */
+	return -EFAULT;
+}
+
+static int vcpu_inject_s2_access_flag_fault(struct kvm_vcpu *vcpu, gpa_t ipa,
+					    int level)
+{
+	/* TODO: Implement */
+	return -EFAULT;
+}
+
+static int check_base_s2_limits(struct kvm_vcpu *vcpu, struct s2_walk_info *wi,
+				int level, int input_size, int stride)
+{
+	int start_size;
+
+	/* Check translation limits */
+	switch (wi->pgsize) {
+	case SZ_64K:
+		if (level == 0 || (level == 1 && pa_max() <= 42))
+			return -EFAULT;
+		break;
+	case SZ_16K:
+		if (level == 0 || (level == 1 && pa_max() <= 40))
+			return -EFAULT;
+		break;
+	case SZ_4K:
+		if (level < 0 || (level == 0 && pa_max() <= 42))
+			return -EFAULT;
+		break;
+	}
+
+	/* Check input size limits */
+	if (input_size > pa_max() &&
+	    (!vcpu_mode_is_32bit(vcpu) || input_size > 40))
+		return -EFAULT;
+
+	/* Check number of entries in starting level table */
+	start_size = input_size - ((3 - level) * stride + wi->pgshift);
+	if (start_size < 1 || start_size > stride + 4)
+		return -EFAULT;
+
+	return 0;
+}
+
+/* Check if output is within boundaries */
+static int check_output_size(struct kvm_vcpu *vcpu, struct s2_walk_info *wi,
+			     phys_addr_t output)
+{
+	unsigned int output_size = ps_to_output_size(wi->ps);
+
+	if (output_size > pa_max())
+		output_size = pa_max();
+
+	if (output_size != 48 && (output & GENMASK_ULL(47, output_size)))
+		return -1;
+
+	return 0;
+}
+
+/*
+ * This is essentially a C-version of the pseudo code from the ARM ARM
+ * AArch64.TranslationTableWalk  function.  I strongly recommend looking at
+ * that pseudocode in trying to understand this.
+ *
+ * Must be called with the kvm->srcy read lock held
+ */
+static int walk_nested_s2_pgd(struct kvm_vcpu *vcpu, phys_addr_t ipa,
+			      struct s2_walk_info *wi, struct kvm_s2_trans *out)
+{
+	u64 vttbr = vcpu->arch.ctxt.el2_regs[VTTBR_EL2];
+	int first_block_level, level, stride, input_size, base_lower_bound;
+	phys_addr_t base_addr;
+	unsigned int addr_top, addr_bottom;
+	u64 desc;  /* page table entry */
+	int ret;
+	phys_addr_t paddr;
+
+	switch (wi->pgsize) {
+	case SZ_64K:
+	case SZ_16K:
+		level = 3 - wi->sl;
+		first_block_level = 2;
+		break;
+	case SZ_4K:
+		level = 2 - wi->sl;
+		first_block_level = 1;
+		break;
+	default:
+		/* GCC is braindead */
+		WARN(1, "Page size is none of 4K, 16K or 64K");
+	}
+
+	stride = wi->pgshift - 3;
+	input_size = 64 - wi->t0sz;
+	if (input_size > 48 || input_size < 25)
+		return -EFAULT;
+
+	ret = check_base_s2_limits(vcpu, wi, level, input_size, stride);
+	if (WARN_ON(ret))
+		return ret;
+
+	if (check_output_size(vcpu, wi, vttbr))
+		return vcpu_inject_s2_addr_sz_fault(vcpu, ipa, level);
+
+	base_lower_bound = 3 + input_size - ((3 - level) * stride +
+			   wi->pgshift);
+	base_addr = vttbr & GENMASK_ULL(47, base_lower_bound);
+
+	addr_top = input_size - 1;
+
+	while (1) {
+		phys_addr_t index;
+
+		addr_bottom = (3 - level) * stride + wi->pgshift;
+		index = (ipa & GENMASK_ULL(addr_top, addr_bottom))
+			>> (addr_bottom - 3);
+
+		paddr = base_addr | index;
+		ret = kvm_read_guest(vcpu->kvm, paddr, &desc, sizeof(desc));
+		if (ret < 0)
+			return ret;
+
+		/* Check for valid descriptor at this point */
+		if (!(desc & 1) || ((desc & 3) == 1 && level == 3))
+			return vcpu_inject_s2_trans_fault(vcpu, ipa, level);
+
+		/* We're at the final level or block translation level */
+		if ((desc & 3) == 1 || level == 3)
+			break;
+
+		if (check_output_size(vcpu, wi, desc))
+			return vcpu_inject_s2_addr_sz_fault(vcpu, ipa, level);
+
+		base_addr = desc & GENMASK_ULL(47, wi->pgshift);
+
+		level += 1;
+		addr_top = addr_bottom - 1;
+	}
+
+	if (level < first_block_level)
+		return vcpu_inject_s2_trans_fault(vcpu, ipa, level);
+
+	/* TODO: Consider checking contiguous bit setting */
+
+	if (check_output_size(vcpu, wi, desc))
+		return vcpu_inject_s2_addr_sz_fault(vcpu, ipa, level);
+
+	if (!(desc & BIT(10)))
+		return vcpu_inject_s2_access_flag_fault(vcpu, ipa, level);
+
+	/* Calculate and return the result */
+	paddr = (desc & GENMASK_ULL(47, addr_bottom)) |
+		(ipa & GENMASK_ULL(addr_bottom - 1, 0));
+	out->output = paddr;
+	out->block_size = 1UL << ((3 - level) * stride + wi->pgshift);
+	return 0;
+}
+
+int kvm_walk_nested_s2(struct kvm_vcpu *vcpu, phys_addr_t gipa,
+		       struct kvm_s2_trans *result)
+{
+	u64 vtcr = vcpu->arch.ctxt.el2_regs[VTCR_EL2];
+	struct s2_walk_info wi;
+
+	wi.t0sz = vtcr & TCR_EL2_T0SZ_MASK;
+
+	switch (vtcr & VTCR_EL2_TG0_MASK) {
+	case VTCR_EL2_TG0_4K:
+		wi.pgshift = 12;	 break;
+	case VTCR_EL2_TG0_16K:
+		wi.pgshift = 14;	 break;
+	case VTCR_EL2_TG0_64K:
+	default:
+		wi.pgshift = 16;	 break;
+	}
+	wi.pgsize = 1UL << wi.pgshift;
+	wi.ps = (vtcr & VTCR_EL2_PS_MASK) >> VTCR_EL2_PS_SHIFT;
+	wi.sl = (vtcr & VTCR_EL2_SL0_MASK) >> VTCR_EL2_SL0_SHIFT;
+
+	/* TODO: Reversedescriptor if SCTLR_EL2.EE == 1 */
+
+	return walk_nested_s2_pgd(vcpu, gipa, &wi, result);
+}
 
 /* expects kvm->mmu_lock to be held */
 void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm)

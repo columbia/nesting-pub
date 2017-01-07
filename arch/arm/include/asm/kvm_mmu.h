@@ -230,6 +230,17 @@ static inline unsigned int kvm_get_vmid_bits(void)
 	return 8;
 }
 
+struct kvm_s2_trans {
+	phys_addr_t output;
+	phys_addr_t block_size;
+};
+
+static inline int kvm_walk_nested_s2(struct kvm_vcpu *vcpu, phys_addr_t gipa,
+				     struct kvm_s2_trans *result)
+{
+	return 0;
+}
+
 static inline void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu) { }
 static inline int kvm_nested_s2_init(struct kvm_vcpu *vcpu) { return 0; }
 static inline void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu) { }

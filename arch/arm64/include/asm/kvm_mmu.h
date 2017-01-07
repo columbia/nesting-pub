@@ -324,10 +324,17 @@ static inline unsigned int kvm_get_vmid_bits(void)
 	return (cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
 }
 
+struct kvm_s2_trans {
+	phys_addr_t output;
+	phys_addr_t block_size;
+};
+
 #ifdef CONFIG_KVM_ARM_NESTED_HYP
 struct kvm_nested_s2_mmu *get_nested_mmu(struct kvm_vcpu *vcpu, u64 vttbr);
 struct kvm_s2_mmu *vcpu_get_active_s2_mmu(struct kvm_vcpu *vcpu);
 bool handle_vttbr_update(struct kvm_vcpu *vcpu, u64 vttbr);
+int kvm_walk_nested_s2(struct kvm_vcpu *vcpu, phys_addr_t gipa,
+		       struct kvm_s2_trans *result);
 void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu);
 int kvm_nested_s2_init(struct kvm_vcpu *vcpu);
 void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu);
@@ -348,6 +355,12 @@ static inline struct kvm_s2_mmu *vcpu_get_active_s2_mmu(struct kvm_vcpu *vcpu)
 static inline bool handle_vttbr_update(struct kvm_vcpu *vcpu, u64 vttbr)
 {
 	return false;
+}
+
+static inline int kvm_walk_nested_s2(struct kvm_vcpu *vcpu, phys_addr_t gipa,
+				     struct kvm_s2_trans *result)
+{
+	return 0;
 }
 
 static inline void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu) { }
