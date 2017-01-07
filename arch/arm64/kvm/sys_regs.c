@@ -960,6 +960,19 @@ static bool access_cpacr(struct kvm_vcpu *vcpu,
 	return true;
 }
 
+static bool access_vttbr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+			 const struct sys_reg_desc *r)
+{
+	u64 vttbr = p->regval;
+
+	if (!p->is_write) {
+		p->regval = vcpu_el2_reg(vcpu, r->reg);
+		return true;
+	}
+
+	return handle_vttbr_update(vcpu, vttbr);
+}
+
 static bool trap_el2_reg(struct kvm_vcpu *vcpu,
 			 struct sys_reg_params *p,
 			 const struct sys_reg_desc *r)
@@ -1306,7 +1319,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 	  trap_el2_reg, reset_el2_val, TCR_EL2, 0 },
 	/* VTTBR_EL2 */
 	{ Op0(0b11), Op1(0b100), CRn(0b0010), CRm(0b0001), Op2(0b000),
-	  trap_el2_reg, reset_el2_val, VTTBR_EL2, 0 },
+	  access_vttbr, reset_el2_val, VTTBR_EL2, 0 },
 	/* VTCR_EL2 */
 	{ Op0(0b11), Op1(0b100), CRn(0b0010), CRm(0b0001), Op2(0b010),
 	  trap_el2_reg, reset_el2_val, VTCR_EL2, 0 },

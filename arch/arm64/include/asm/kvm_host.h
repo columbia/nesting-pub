@@ -99,6 +99,7 @@ struct kvm_arch {
 
 	/* Stage 2 shadow paging contexts for nested L2 VM */
 	struct list_head nested_mmu_list;
+	spinlock_t mmu_list_lock;
 };
 
 #define KVM_NR_MEM_OBJS     40

@@ -84,6 +84,7 @@ struct kvm_arch {
 
 	/* Never used on arm but added to be compatible with arm64 */
 	struct list_head nested_mmu_list;
+	spinlock_t mmu_list_lock;
 
 	/* Interrupt controller */
 	struct vgic_dist	vgic;

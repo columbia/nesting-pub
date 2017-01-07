@@ -327,6 +327,7 @@ static inline unsigned int kvm_get_vmid_bits(void)
 #ifdef CONFIG_KVM_ARM_NESTED_HYP
 struct kvm_nested_s2_mmu *get_nested_mmu(struct kvm_vcpu *vcpu, u64 vttbr);
 struct kvm_s2_mmu *vcpu_get_active_s2_mmu(struct kvm_vcpu *vcpu);
+bool handle_vttbr_update(struct kvm_vcpu *vcpu, u64 vttbr);
 #else
 static inline struct kvm_nested_s2_mmu *get_nested_mmu(struct kvm_vcpu *vcpu,
 						       u64 vttbr)
@@ -336,6 +337,11 @@ static inline struct kvm_nested_s2_mmu *get_nested_mmu(struct kvm_vcpu *vcpu,
 static inline struct kvm_s2_mmu *vcpu_get_active_s2_mmu(struct kvm_vcpu *vcpu)
 {
 	return &vcpu->kvm->arch.mmu;
+}
+
+static inline bool handle_vttbr_update(struct kvm_vcpu *vcpu, u64 vttbr)
+{
+	return false;
 }
 #endif
 
