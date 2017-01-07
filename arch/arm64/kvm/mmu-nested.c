@@ -52,6 +52,19 @@ static unsigned int pa_max(void)
 	return ps_to_output_size(parange);
 }
 
+static int vcpu_inject_s2_perm_fault(struct kvm_vcpu *vcpu, gpa_t ipa,
+				     int level)
+{
+	u32 esr;
+
+	vcpu->arch.ctxt.el2_regs[FAR_EL2] = vcpu->arch.fault.far_el2;
+	vcpu->arch.ctxt.el2_regs[HPFAR_EL2] = vcpu->arch.fault.hpfar_el2;
+	esr = kvm_vcpu_get_hsr(vcpu) & ~ESR_ELx_FSC;
+	esr |= ESR_ELx_FSC_PERM;
+	esr |= level & 0x3;
+	return kvm_inject_nested_sync(vcpu, esr);
+}
+
 static int vcpu_inject_s2_trans_fault(struct kvm_vcpu *vcpu, gpa_t ipa,
 				      int level)
 {
@@ -266,6 +279,26 @@ int kvm_walk_nested_s2(struct kvm_vcpu *vcpu, phys_addr_t gipa,
 	/* TODO: Reversedescriptor if SCTLR_EL2.EE == 1 */
 
 	return walk_nested_s2_pgd(vcpu, gipa, &wi, result);
+}
+
+/*
+ * Returns non-zero if permission fault is handled by injecting it to the next
+ * level hypervisor.
+ */
+int kvm_s2_handle_perm_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+			     struct kvm_s2_trans *trans)
+{
+	unsigned long fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+	bool write_fault = kvm_is_write_fault(vcpu);
+
+	if (fault_status != FSC_PERM)
+		return 0;
+
+	if ((write_fault && !trans->writable) ||
+	    (!write_fault && !trans->readable))
+		return vcpu_inject_s2_perm_fault(vcpu, fault_ipa, trans->level);
+
+	return 0;
 }
 
 /* expects kvm->mmu_lock to be held */
