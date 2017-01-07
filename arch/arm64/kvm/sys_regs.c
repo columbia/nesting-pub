@@ -1150,6 +1150,20 @@ static bool access_cpacr(struct kvm_vcpu *vcpu,
 	return true;
 }
 
+static bool access_vttbr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+			 const struct sys_reg_desc *r)
+{
+	u64 vttbr = p->regval;
+
+	if (!p->is_write) {
+		p->regval = vcpu_sys_reg(vcpu, r->reg);
+		return true;
+	}
+
+	vcpu_sys_reg(vcpu, r->reg) = p->regval;
+	return handle_vttbr_update(vcpu, vttbr);
+}
+
 /*
  * Architected system registers.
  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
@@ -1352,7 +1366,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 	{ SYS_DESC(SYS_TTBR0_EL2), trap_el2_regs, reset_val, TTBR0_EL2, 0 },
 	{ SYS_DESC(SYS_TTBR1_EL2), trap_el2_regs, reset_val, TTBR1_EL2, 0 },
 	{ SYS_DESC(SYS_TCR_EL2), trap_el2_regs, reset_val, TCR_EL2, 0 },
-	{ SYS_DESC(SYS_VTTBR_EL2), trap_el2_regs, reset_val, VTTBR_EL2, 0 },
+	{ SYS_DESC(SYS_VTTBR_EL2), access_vttbr, reset_val, VTTBR_EL2, 0 },
 	{ SYS_DESC(SYS_VTCR_EL2), trap_el2_regs, reset_val, VTCR_EL2, 0 },
 
 	{ SYS_DESC(SYS_DACR32_EL2), NULL, reset_unknown, DACR32_EL2 },
