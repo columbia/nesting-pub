@@ -150,16 +150,18 @@ static void flush_shadow_special_regs(struct kvm_vcpu *vcpu)
 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
 
 	ctxt->hw_pstate = *vcpu_cpsr(vcpu) & ~PSR_MODE_MASK;
-	/*
-	 * We can emulate the guest's configuration of which
-	 * stack pointer to use when executing in virtual EL2 by
-	 * using the equivalent feature in EL1 to point to
-	 * either the EL1 or EL0 stack pointer.
-	 */
-	if ((*vcpu_cpsr(vcpu) & PSR_MODE_MASK) == PSR_MODE_EL2h)
-		ctxt->hw_pstate |= PSR_MODE_EL1h;
-	else
-		ctxt->hw_pstate |= PSR_MODE_EL1t;
+	if (vcpu_mode_el2(vcpu)) {
+		/*
+		 * We can emulate the guest's configuration of which
+		 * stack pointer to use when executing in virtual EL2 by
+		 * using the equivalent feature in EL1 to point to
+		 * either the EL1 or EL0 stack pointer.
+		 */
+		if ((*vcpu_cpsr(vcpu) & PSR_MODE_MASK) == PSR_MODE_EL2h)
+			ctxt->hw_pstate |= PSR_MODE_EL1h;
+		else
+			ctxt->hw_pstate |= PSR_MODE_EL1t;
+	}
 
 	ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
 	ctxt->hw_sp_el1 = vcpu_el2_sreg(vcpu, SP_EL2);
@@ -182,8 +184,14 @@ static void sync_shadow_special_regs(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
 
-	*vcpu_cpsr(vcpu) &= PSR_MODE_MASK;
-	*vcpu_cpsr(vcpu) |= ctxt->hw_pstate & ~PSR_MODE_MASK;
+	*vcpu_cpsr(vcpu) = ctxt->hw_pstate;
+	*vcpu_cpsr(vcpu) &= ~PSR_MODE_MASK;
+	/* Set vcpu exception level depending on the physical EL */
+	if ((ctxt->hw_pstate & PSR_MODE_MASK) == PSR_MODE_EL0t)
+		*vcpu_cpsr(vcpu) |= PSR_MODE_EL0t;
+	else
+		*vcpu_cpsr(vcpu) |= PSR_MODE_EL2h;
+
 	vcpu_el2_sreg(vcpu, SP_EL2) = ctxt->hw_sp_el1;
 	vcpu_el2_sreg(vcpu, ELR_EL2) = ctxt->hw_elr_el1;
 	vcpu_el2_sreg(vcpu, SPSR_EL2) = ctxt->hw_spsr_el1;
@@ -218,7 +226,7 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
 
-	if (unlikely(vcpu_mode_el2(vcpu))) {
+	if (unlikely(is_hyp_ctxt(vcpu))) {
 		flush_shadow_special_regs(vcpu);
 		flush_shadow_el1_sysregs(vcpu);
 		flush_shadow_non_trap_el1_state(vcpu);
@@ -236,7 +244,7 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
  */
 void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
 {
-	if (unlikely(vcpu_mode_el2(vcpu))) {
+	if (unlikely(is_hyp_ctxt(vcpu))) {
 		sync_shadow_special_regs(vcpu);
 		sync_shadow_non_trap_el1_state(vcpu);
 	} else
