@@ -110,6 +110,31 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
 	return true;
 }
 
+struct el1_el2_map {
+	int	el1;
+	int	el2;
+};
+
+static const struct el1_el2_map vm_map[] = {
+	{SCTLR_EL1, SCTLR_EL2},
+	{TTBR0_EL1, TTBR0_EL2},
+	{TTBR1_EL1, TTBR1_EL2},
+	{TCR_EL1, TCR_EL2},
+	{ESR_EL1, ESR_EL2},
+	{FAR_EL1, FAR_EL2},
+	{AFSR0_EL1, AFSR0_EL2},
+	{AFSR1_EL1, AFSR1_EL2},
+	{MAIR_EL1, MAIR_EL2},
+	{AMAIR_EL1, AMAIR_EL2},
+	{CONTEXTIDR_EL1, CONTEXTIDR_EL2},
+};
+
+static inline bool el12_reg(struct sys_reg_params *p)
+{
+	/* All *_EL12 registers have Op1=5. */
+	return (p->Op1 == 5);
+}
+
 /*
  * Generic accessor for VM registers. Only called as long as HCR_TVM
  * is set. If the guest enables the MMU, we stop trapping the VM
@@ -120,16 +145,33 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
 			  const struct sys_reg_desc *r)
 {
 	bool was_enabled = vcpu_has_cache_enabled(vcpu);
+	u64 *sysreg = &vcpu_sys_reg(vcpu, r->reg);
+	int i;
+	const struct el1_el2_map *map;
+
+	/*
+	 * Redirect EL1 register accesses to the corresponding EL2 registers if
+	 * they are meant to access EL2 registers.
+	 */
+	if (vcpu_el2_e2h_is_set(vcpu) && !el12_reg(p)) {
+		for (i = 0; i < ARRAY_SIZE(vm_map); i++) {
+			map = &vm_map[i];
+			if (map->el1 == r->reg) {
+				sysreg = &vcpu_sys_reg(vcpu, map->el2);
+				break;
+			}
+		}
+	}
 
 	BUG_ON(!vcpu_mode_el2(vcpu) && !p->is_write);
 
 	if (!p->is_write) {
-		p->regval = vcpu_sys_reg(vcpu, r->reg);
+		p->regval = *sysreg;
 		return true;
 	}
 
 	if (!p->is_aarch32) {
-		vcpu_sys_reg(vcpu, r->reg) = p->regval;
+		*sysreg = p->regval;
 	} else {
 		if (!p->is_32bit)
 			vcpu_cp15_64_high(vcpu, r->reg) = upper_32_bits(p->regval);
