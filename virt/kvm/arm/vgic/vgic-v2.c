@@ -111,6 +111,10 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
 	vgic_cpu->used_lrs = 0;
 }
 
+u32 vgic_v2_get_lr(struct kvm_vcpu *vcpu, int lr)
+{
+	return vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr];
+}
 /*
  * Populates the particular LR with the state of a given IRQ:
  * - for an edge sensitive IRQ the pending state is cleared in struct vgic_irq
