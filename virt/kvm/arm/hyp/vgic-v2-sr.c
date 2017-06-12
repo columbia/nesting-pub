@@ -50,16 +50,19 @@ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
 {
 	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
 	int i;
-	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
 
-	for (i = 0; i < used_lrs; i++) {
-		if (cpu_if->vgic_elrsr & (1UL << i))
-			cpu_if->vgic_lr[i] &= ~GICH_LR_STATE;
-		else
-			cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
+        for (i = 0; i < nr_lr; i++) {
+                if (!(vcpu->arch.vgic_cpu.live_lrs & (1UL << i)))
+                        continue;
 
-		writel_relaxed(0, base + GICH_LR0 + (i * 4));
-	}
+                if (cpu_if->vgic_elrsr & (1UL << i))
+                        cpu_if->vgic_lr[i] &= ~GICH_LR_STATE;
+                else
+                        cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
+
+                writel_relaxed(0, base + GICH_LR0 + (i * 4));
+        }
 }
 
 /* vcpu is already in the HYP VA space */
@@ -69,18 +72,18 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
 	struct vgic_v2_cpu_if *cpu_if = __hyp_get_cpu_if(vcpu);
 	struct vgic_dist *vgic = &kvm->arch.vgic;
 	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
-	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
 
 	if (!base)
 		return;
 
-	if (used_lrs) {
+	if (vcpu->arch.vgic_cpu.live_lrs) {
 		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
 
 		save_elrsr(vcpu, base);
 		save_lrs(vcpu, base);
 
 		writel_relaxed(0, base + GICH_HCR);
+		vcpu->arch.vgic_cpu.live_lrs = 0;
 	} else {
 		cpu_if->vgic_elrsr = ~0UL;
 		cpu_if->vgic_apr = 0;
@@ -95,19 +98,30 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
 	struct vgic_dist *vgic = &kvm->arch.vgic;
 	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
 	int i;
-	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+	u64 live_lrs = 0;
+	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
 
 	if (!base)
 		return;
 
-	if (used_lrs) {
+        for (i = 0; i < nr_lr; i++)
+                if (cpu_if->vgic_lr[i] & GICH_LR_STATE)
+                        live_lrs |= 1UL << i;
+
+	if (live_lrs) {
 		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
 		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
-		for (i = 0; i < used_lrs; i++) {
-			writel_relaxed(cpu_if->vgic_lr[i],
-				       base + GICH_LR0 + (i * 4));
-		}
+		for (i = 0; i < nr_lr; i++) {
+			if (!(live_lrs & (1UL << i))) {
+				writel_relaxed(0, base + GICH_LR0 + (i * 4));
+				continue;
+			}
+
+                        writel_relaxed(cpu_if->vgic_lr[i],
+                                       base + GICH_LR0 + (i * 4));
+                }
 	}
+	vcpu->arch.vgic_cpu.live_lrs = live_lrs;
 }
 
 #ifdef CONFIG_ARM64
