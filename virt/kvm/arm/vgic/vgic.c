@@ -20,6 +20,7 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <asm/kvm_emulate.h>
+#include <linux/irqchip/arm-gic.h>
 
 #include "vgic.h"
 
@@ -650,6 +651,15 @@ static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
 		vgic_v3_set_underflow(vcpu);
 }
 
+static inline u32 vgic_get_lr(struct kvm_vcpu *vcpu, int lr)
+{
+	if (kvm_vgic_global_state.type == VGIC_V2)
+		return vgic_v2_get_lr(vcpu, lr);
+
+	// TODO: implement vgic_v3_get_lr(). This is 64 bit
+	return 0;
+}
+
 /* Requires the ap_list_lock to be held. */
 static int compute_ap_list_depth(struct kvm_vcpu *vcpu)
 {
@@ -677,6 +687,7 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
 	struct vgic_irq *irq;
 	int count = 0;
+	int i = 0;
 
 	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
 
@@ -722,14 +733,9 @@ next:
 	 * means an irq of which state is pending but not active.
 	 */
 	if (vcpu_el2_imo_is_set(vcpu) && !vcpu_mode_el2(vcpu)) {
-		bool pending = false;
-
-		list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
-			spin_lock(&irq->irq_lock);
-			pending = irq_is_pending(irq) && irq->enabled && !irq->active;
-			spin_unlock(&irq->irq_lock);
-
-			if (pending) {
+		for (i = 0; i < vcpu->arch.vgic_cpu.used_lrs; i++) {
+			u32 vgic_lr = vgic_get_lr(vcpu, i);
+			if ((GICH_LR_PENDING_BIT & vgic_lr) && (!(GICH_LR_ACTIVE_BIT & vgic_lr))) {
 				kvm_inject_nested_irq(vcpu);
 				break;
 			}
