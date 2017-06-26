@@ -386,4 +386,6 @@ static inline void __cpu_init_stage2(void)
 		  "PARange is %d bits, unsupported configuration!", parange);
 }
 
+int __init kvmarm_nested_cfg(char *buf);
+
 #endif /* __ARM64_KVM_HOST_H__ */
