@@ -299,4 +299,8 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
 int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
 			       struct kvm_device_attr *attr);
 
+static inline int __init kvmarm_nested_cfg(char *buf)
+{
+	return 0;
+}
 #endif /* __ARM_KVM_HOST_H__ */
