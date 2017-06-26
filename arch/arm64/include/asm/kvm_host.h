@@ -396,4 +396,6 @@ static inline void kvm_fpsimd_flush_cpu_state(void)
 		sve_flush_cpu_state();
 }
 
+int __init kvmarm_nested_cfg(char *buf);
+
 #endif /* __ARM64_KVM_HOST_H__ */

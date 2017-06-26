@@ -301,4 +301,8 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
 /* All host FP/SIMD state is restored on guest exit, so nothing to save: */
 static inline void kvm_fpsimd_flush_cpu_state(void) {}
 
+static inline int __init kvmarm_nested_cfg(char *buf)
+{
+	return 0;
+}
 #endif /* __ARM_KVM_HOST_H__ */
