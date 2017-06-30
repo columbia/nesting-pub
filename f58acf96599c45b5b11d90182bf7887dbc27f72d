@@ -1,6 +1,7 @@
 v1-->v2:
 Added Linaro in the copyright.
 Allowed to inject exceptions while the current exception level is virtual EL2.
+Don't propagate esr_el2 state to the VM when injecting an irq.
 Rewrote the comment message.
 
 v1-->v2:
