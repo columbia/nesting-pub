@@ -1,0 +1,6 @@
+v1-->v2:
+Cleaned up comments mentioning paravirtualization.
+Name is not changed. shadow_state.c ?
+
+TODO:
+Consider different bit positions of CPTR_EL2 in case of VHE-guest
