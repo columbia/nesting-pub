@@ -1,2 +1,3 @@
 v1-->v2:
+Allow injecting exceptions while it's in virtual EL2.
 Rewrote the comment message.
