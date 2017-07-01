@@ -2,3 +2,18 @@ v1-->v2:
 Fix a bug that accessing sys_regs[] array for SP_EL1, which is saved in kvm_regs[].
 Forward el2 register accesses if the virtual HCR_EL2.NV bit is set.
 Use the same reset function as EL1 regs.
+
+Notes:
+    v1-->v2
+    Forward el2 register accesses if the virtual HCR_EL2.NV bit is set.
+
+    TODO:
+    Do not forget to add SP_EL2 later.
+    Add vttbr_el2 here.
+
+v1-->v2
+Forward el2 register accesses if the virtual HCR_EL2.NV bit is set.
+
+TODO:
+Do not forget to add SP_EL2 later.
+Add vttbr_el2 here.
