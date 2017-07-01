@@ -1,2 +1,3 @@
 v1-->v2:
 Forward el2 register accesses if the virtual HCR_EL2.NV bit is set.
+Use the same reset function as EL1 regs
