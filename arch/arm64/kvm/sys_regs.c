@@ -892,6 +892,27 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
 	return true;
 }
 
+static inline void access_rw(struct sys_reg_params *p, u64 *sysreg)
+{
+	if (!p->is_write)
+		p->regval = *sysreg;
+	else
+		*sysreg = p->regval;
+}
+
+static bool trap_el2_regs(struct kvm_vcpu *vcpu,
+			 struct sys_reg_params *p,
+			 const struct sys_reg_desc *r)
+{
+	/* SP_EL1 is NOT maintained in sys_regs array */
+	if (sys_reg(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2) == SYS_SP_EL1)
+		access_rw(p, &vcpu->arch.ctxt.gp_regs.sp_el1);
+	else
+		access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
+
+	return true;
+}
+
 /*
  * Architected system registers.
  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
@@ -1077,9 +1098,46 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 	 */
 	{ SYS_DESC(SYS_PMCCFILTR_EL0), access_pmu_evtyper, reset_val, PMCCFILTR_EL0, 0 },
 
+	{ SYS_DESC(SYS_VPIDR_EL2), trap_el2_regs, reset_val, VPIDR_EL2, 0 },
+	{ SYS_DESC(SYS_VMPIDR_EL2), trap_el2_regs, reset_val, VMPIDR_EL2, 0 },
+
+	{ SYS_DESC(SYS_SCTLR_EL2), trap_el2_regs, reset_val, SCTLR_EL2, 0 },
+	{ SYS_DESC(SYS_ACTLR_EL2), trap_el2_regs, reset_val, ACTLR_EL2, 0 },
+	{ SYS_DESC(SYS_HCR_EL2), trap_el2_regs, reset_val, HCR_EL2, 0 },
+	{ SYS_DESC(SYS_MDCR_EL2), trap_el2_regs, reset_val, MDCR_EL2, 0 },
+	{ SYS_DESC(SYS_CPTR_EL2), trap_el2_regs, reset_val, CPTR_EL2, 0 },
+	{ SYS_DESC(SYS_HSTR_EL2), trap_el2_regs, reset_val, HSTR_EL2, 0 },
+	{ SYS_DESC(SYS_HACR_EL2), trap_el2_regs, reset_val, HACR_EL2, 0 },
+
+	{ SYS_DESC(SYS_TTBR0_EL2), trap_el2_regs, reset_val, TTBR0_EL2, 0 },
+	{ SYS_DESC(SYS_TCR_EL2), trap_el2_regs, reset_val, TCR_EL2, 0 },
+	{ SYS_DESC(SYS_VTTBR_EL2), trap_el2_regs, reset_val, VTTBR_EL2, 0 },
+	{ SYS_DESC(SYS_VTCR_EL2), trap_el2_regs, reset_val, VTCR_EL2, 0 },
+
 	{ SYS_DESC(SYS_DACR32_EL2), NULL, reset_unknown, DACR32_EL2 },
+
+	{ SYS_DESC(SYS_SP_EL1), trap_el2_regs },
+
 	{ SYS_DESC(SYS_IFSR32_EL2), NULL, reset_unknown, IFSR32_EL2 },
+	{ SYS_DESC(SYS_AFSR0_EL2), trap_el2_regs, reset_val, AFSR0_EL2, 0 },
+	{ SYS_DESC(SYS_AFSR1_EL2), trap_el2_regs, reset_val, AFSR1_EL2, 0 },
+	{ SYS_DESC(SYS_ESR_EL2), trap_el2_regs, reset_val, ESR_EL2, 0 },
 	{ SYS_DESC(SYS_FPEXC32_EL2), NULL, reset_val, FPEXC32_EL2, 0x70 },
+
+	{ SYS_DESC(SYS_FAR_EL2), trap_el2_regs, reset_val, FAR_EL2, 0 },
+	{ SYS_DESC(SYS_HPFAR_EL2), trap_el2_regs, reset_val, HPFAR_EL2, 0 },
+
+	{ SYS_DESC(SYS_MAIR_EL2), trap_el2_regs, reset_val, MAIR_EL2, 0 },
+	{ SYS_DESC(SYS_AMAIR_EL2), trap_el2_regs, reset_val, AMAIR_EL2, 0 },
+
+	{ SYS_DESC(SYS_VBAR_EL2), trap_el2_regs, reset_val, VBAR_EL2, 0 },
+	{ SYS_DESC(SYS_RVBAR_EL2), trap_el2_regs, reset_val, RVBAR_EL2, 0 },
+	{ SYS_DESC(SYS_RMR_EL2), trap_el2_regs, reset_val, RMR_EL2, 0 },
+
+	{ SYS_DESC(SYS_TPIDR_EL2), trap_el2_regs, reset_val, TPIDR_EL2, 0 },
+
+	{ SYS_DESC(SYS_CNTVOFF_EL2), trap_el2_regs, reset_val, CNTVOFF_EL2, 0 },
+	{ SYS_DESC(SYS_CNTHCTL_EL2), trap_el2_regs, reset_val, CNTHCTL_EL2, 0 },
 };
 
 static bool trap_dbgidr(struct kvm_vcpu *vcpu,
