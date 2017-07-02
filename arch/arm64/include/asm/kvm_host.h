@@ -229,6 +229,19 @@ struct kvm_cpu_context {
 	};
 
 	u64 el2_special_regs[NR_EL2_SPECIAL_REGS];
+
+	u64 shadow_sys_regs[NR_SYS_REGS];  /* only used for virtual EL2 */
+
+	/*
+	 * hw_* will be written to the hardware when entering to a VM.
+	 * They have either the virtual EL2 or EL1/EL0 context depending
+	 * on the vcpu mode.
+	 */
+	u64 *hw_sys_regs;
+	u64 hw_sp_el1;
+	u64 hw_pstate;
+	u64 hw_elr_el1;
+	u64 hw_spsr_el1;
 };
 
 typedef struct kvm_cpu_context kvm_cpu_context_t;
