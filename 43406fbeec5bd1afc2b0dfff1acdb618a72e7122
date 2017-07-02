@@ -1,0 +1,5 @@
+v1-->v2:
+Cleaned up the comments about the list of EL1 registers we don't trap.
+
+TODO:
+I may be able to add some more explanation for it.
