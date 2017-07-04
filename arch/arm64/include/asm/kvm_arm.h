@@ -246,4 +246,99 @@
 #define CPACR_EL1_TTA		(1 << 28)
 #define CPACR_EL1_DEFAULT	(CPACR_EL1_FPEN | CPACR_EL1_ZEN_EL1EN)
 
+#ifdef CONFIG_KVM_ARM_NESTED_PV
+/*
+ * 0 is reserved as an invalid value.
+ * Order should be kept in sync with the save/restore code.
+ */
+#define	__INVALID_SYSREG__ 0
+#define	MPIDR_EL1	1	/* MultiProcessor Affinity Register */
+#define	CSSELR_EL1	2	/* Cache Size Selection Register */
+#define	SCTLR_EL1	3	/* System Control Register */
+#define	ACTLR_EL1	4	/* Auxiliary Control Register */
+#define	CPACR_EL1	5	/* Coprocessor Access Control */
+#define	TTBR0_EL1	6	/* Translation Table Base Register 0 */
+#define	TTBR1_EL1	7	/* Translation Table Base Register 1 */
+#define	TCR_EL1		8	/* Translation Control Register */
+#define	ESR_EL1		9	/* Exception Syndrome Register */
+#define	AFSR0_EL1	10	/* Auxiliary Fault Status Register 0 */
+#define	AFSR1_EL1	11	/* Auxiliary Fault Status Register 1 */
+#define	FAR_EL1		12	/* Fault Address Register */
+#define	MAIR_EL1	13	/* Memory Attribute Indirection Register */
+#define	VBAR_EL1	14	/* Vector Base Address Register */
+#define	CONTEXTIDR_EL1	15	/* Context ID Register */
+#define	TPIDR_EL0	16	/* Thread ID, User R/W */
+#define	TPIDRRO_EL0	17	/* Thread ID, User R/O */
+#define	TPIDR_EL1	18	/* Thread ID, Privileged */
+#define	AMAIR_EL1	19	/* Aux Memory Attribute Indirection Register */
+#define	CNTKCTL_EL1	20	/* Timer Control Register (EL1) */
+#define	PAR_EL1		21	/* Physical Address Register */
+#define	MDSCR_EL1	22	/* Monitor Debug System Control Register */
+#define	MDCCINT_EL1	23	/* Monitor Debug Comms Channel Interrupt Enable Reg */
+/* Performance Monitors Registers */
+#define	PMCR_EL0	24	/* Control Register */
+#define	PMSELR_EL0	25	/* Event Counter Selection Register */
+#define	PMEVCNTR0_EL0	26	/* Event Counter Register (0-30) */
+#define	PMEVCNTR30_EL0  (PMEVCNTR0_EL0 + 30)
+#define	PMCCNTR_EL0	57	/* Cycle Counter Register */
+#define	PMEVTYPER0_EL0	58	/* Event Type Register (0-30) */
+#define	PMEVTYPER30_EL0 (PMEVTYPER0_EL0 + 30)
+#define	PMCCFILTR_EL0	89	/* Cycle Count Filter Register */
+#define	PMCNTENSET_EL0	90	/* Count Enable Set Register */
+#define	PMINTENSET_EL1	91	/* Interrupt Enable Set Register */
+#define	PMOVSSET_EL0	92	/* Overflow Flag Status Set Register */
+#define	PMSWINC_EL0	93	/* Software Increment Register */
+#define	PMUSERENR_EL0	94	/* User Enable Register */
+/* 32bit specific registers. Keep them at the end of the range */
+#define	DACR32_EL2	95	/* Domain Access Control Register */
+#define	IFSR32_EL2	96	/* Instruction Fault Status Register */
+#define	FPEXC32_EL2	97	/* Floating-Point Exception Control Register */
+#define	DBGVCR32_EL2	98	/* Debug Vector Catch Register */
+/* EL2 Regs */
+#define VPIDR_EL2	99      /* Virtualization Processor ID Register */
+#define VMPIDR_EL2	100	/* Virtualization Multiprocessor ID Register */
+#define SCTLR_EL2	101	/* System Control Register (EL2) */
+#define ACTLR_EL2	102	/* Auxiliary Control Register (EL2) */
+#define HCR_EL2		103	/* Hypervisor Configuration Register */
+#define MDCR_EL2	104	/* Monitor Debug Configuration Register (EL2) */
+#define CPTR_EL2	105	/* Architectural Feature Trap Register (EL2) */
+#define HSTR_EL2	106	/* Hypervisor System Trap Register */
+#define HACR_EL2	107	/* Hypervisor Auxiliary Control Register */
+#define TTBR0_EL2	108	/* Translation Table Base Register 0 (EL2) */
+#define TTBR1_EL2	109	/* Translation Table Base Register 1 (EL2) */
+#define TCR_EL2		110	/* Translation Control Register (EL2) */
+#define VTTBR_EL2	111	/* Virtualization Translation Table Base Register */
+#define VTCR_EL2	112	/* Virtualization Translation Control Register */
+#define AFSR0_EL2	113	/* Auxiliary Fault Status Register 0 (EL2) */
+#define AFSR1_EL2	114	/* Auxiliary Fault Status Register 1 (EL2) */
+#define ESR_EL2		115	/* Exception Syndrome Register (EL2) */
+#define FAR_EL2		116	/* Hypervisor IPA Fault Address Register */
+#define HPFAR_EL2	117	/* Hypervisor IPA Fault Address Register */
+#define MAIR_EL2	118	/* Memory Attribute Indirection Register (EL2) */
+#define AMAIR_EL2	119	/* Auxiliary Memory Attribute Indirection Register (EL2) */
+#define VBAR_EL2	120	/* Vector Base Address Register (EL2) */
+#define RVBAR_EL2	121	/* Reset Vector Base Address Register */
+#define RMR_EL2		122	/* Reset Management Register */
+#define	CONTEXTIDR_EL2	123	/* Context ID Register */
+#define TPIDR_EL2	124	/* EL2 Software Thread ID Register */
+#define CNTVOFF_EL2	125	/* Counter-timer Virtual Offset register */
+#define CNTHCTL_EL2	126	/* Counter-timer Hypervisor Control register */
+
+#define	NR_SYS_REGS	127	/* Nothing after this line! */
+
+#define	SP_EL1		128	/* Stack pointer (EL1) */
+#define	ELR_EL1		129	/* Exception Link Register */
+#define	SPSR_EL1	130	/* Saved Program Status Register */
+
+#define SPSR_EL2_PV	131	/* Saved Program Status Register (EL2) */
+#define ELR_EL2_PV	132	/* Exception Link Register (EL2) */
+#define SP_EL2_PV	133	/* Stack Pointer (EL2) */
+
+#define SPSR_EL2	1	/* Saved Program Status Register (EL2) */
+#define ELR_EL2		2	/* Exception Link Register (EL2) */
+#define SP_EL2		3	/* Stack Pointer (EL2) */
+#define	NR_EL2_SPECIAL_REGS	4	/* Nothing after this line! */
+
+#endif
+
 #endif /* __ARM64_KVM_ARM_H__ */

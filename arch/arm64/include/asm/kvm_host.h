@@ -123,6 +123,7 @@ struct kvm_vcpu_fault_info {
 	u64 hpfar_el2;		/* Hyp IPA Fault Address Register */
 };
 
+#ifndef CONFIG_KVM_ARM_NESTED_PV
 /*
  * 0 is reserved as an invalid value.
  * Order should be kept in sync with the save/restore code.
@@ -215,6 +216,7 @@ enum el2_special_regs {
 
 	NR_EL2_SPECIAL_REGS
 };
+#endif
 
 /* 32bit mapping */
 #define c0_MPIDR	(MPIDR_EL1 * 2)	/* MultiProcessor ID Register */

@@ -21,8 +21,8 @@
 #include <asm/kvm_mmu.h>
 
 struct el1_el2_map {
-	enum vcpu_sysreg	el1;
-	enum vcpu_sysreg	el2;
+	int	el1;
+	int	el2;
 };
 
 /*
