@@ -42,3 +42,4 @@ kvm-$(CONFIG_KVM_ARM_HOST) += nested.o
 kvm-$(CONFIG_KVM_ARM_HOST) += mmu-nested.o
 kvm-$(CONFIG_KVM_ARM_HOST) += emulate-nested.o
 kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v2-nested.o
+kvm-$(CONFIG_KVM_ARM_NESTED_PV) += handle_exit_nested_pv.o

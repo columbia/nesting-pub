@@ -51,6 +51,13 @@ config KVM_ARM_HOST
 	---help---
 	  Provides host support for ARM processors.
 
+config KVM_ARM_NESTED_PV
+	bool "Supports Nested Virtualization via PV in the host"
+	depends on KVM
+	---help---
+	  Supports nested virtualization on non-v8.3 via paravirtualized
+	  interface in the host.
+
 config KVM_ARM_PMU
 	bool
 	---help---
