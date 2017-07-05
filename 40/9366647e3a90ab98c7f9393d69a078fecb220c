@@ -1,0 +1,9 @@
+v1-->v2:
+Added Linaro in the copyright.
+Allowed to inject exceptions while the current exception level is virtual EL2.
+Move the irq injection function to a later patch.
+Rewrote the comment message.
+
+TODO:
+We can change the file name to something like inject_exceptions_nested.c
+We can possibly create an unified get_except_vector
