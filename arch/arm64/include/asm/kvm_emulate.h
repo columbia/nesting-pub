@@ -55,6 +55,7 @@ void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
 void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
 
 int kvm_inject_nested_sync(struct kvm_vcpu *vcpu, u64 esr_el2);
+int kvm_inject_nested_irq(struct kvm_vcpu *vcpu);
 
 void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu);
 void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu);
