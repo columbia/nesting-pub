@@ -1,0 +1,7 @@
+v1-->v2:
+Updated comments about the stack pointer as suggested by Christoffer.
+
+TODO:
+Explain about MPIDR_EL1 and VMPIDR_EL2
+Maybe just check the nested configuration and
+remove KVM_ARM_VCPU_NESTED_VIRT here.
