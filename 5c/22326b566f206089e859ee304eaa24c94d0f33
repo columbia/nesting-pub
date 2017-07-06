@@ -1,0 +1,3 @@
+v1-->v2:
+Set MPIDR_EL1 only when nested virtualization is in use.
+Updated comments about the stack pointer.

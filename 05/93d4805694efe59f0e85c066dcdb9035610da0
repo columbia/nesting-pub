@@ -1,0 +1,6 @@
+v1-->v2:
+Check TFP bit explicitly in the fpsimd trap handler.
+Update the commit message to explain the case of the trap from the virtual EL2.
+
+v1-->v2:
+Update the commit message and comments
