@@ -61,3 +61,15 @@ int handle_wfx_nested(struct kvm_vcpu *vcpu, bool is_wfe)
 
 	return -EINVAL;
 }
+
+char *kvm_guest_state(struct kvm_vcpu *vcpu)
+{
+	if (!nested_virt_in_use(vcpu))
+		return "";
+
+       if (is_hyp_ctxt(vcpu))
+               return "L1 Hypervisor";
+       if (vcpu_el2_imo_is_set(vcpu))
+               return "L2 Guest";
+       return "L1 Guest";
+}

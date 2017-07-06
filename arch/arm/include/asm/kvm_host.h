@@ -342,4 +342,8 @@ static inline bool nested_virt_in_use(struct kvm_vcpu *vcpu)
 	return false;
 }
 
+static inline char *kvm_guest_state(struct kvm_vcpu *vcpu)
+{
+	return "";
+}
 #endif /* __ARM_KVM_HOST_H__ */

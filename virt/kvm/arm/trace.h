@@ -11,18 +11,20 @@
  * Tracepoints for entry/exit to guest
  */
 TRACE_EVENT(kvm_entry,
-	TP_PROTO(unsigned long vcpu_pc),
-	TP_ARGS(vcpu_pc),
+	TP_PROTO(unsigned long vcpu_pc, char *state),
+	TP_ARGS(vcpu_pc, state),
 
 	TP_STRUCT__entry(
 		__field(	unsigned long,	vcpu_pc		)
+		__field(		char*,	state		)
 	),
 
 	TP_fast_assign(
 		__entry->vcpu_pc		= vcpu_pc;
+		__entry->state			= state;
 	),
 
-	TP_printk("PC: 0x%08lx", __entry->vcpu_pc)
+	TP_printk("PC: 0x%08lx (%s)", __entry->vcpu_pc, __entry->state)
 );
 
 TRACE_EVENT(kvm_exit,
