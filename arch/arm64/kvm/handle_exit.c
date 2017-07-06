@@ -45,8 +45,16 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
 
 	/* Forward hvc instructions to the virtual EL2 if the guest has EL2. */
 	if (nested_virt_in_use(vcpu)) {
+#ifndef CONFIG_KVM_ARM_NESTED_PV
 		kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
 		return 1;
+#else
+		ret = handle_hvc_nested(vcpu);
+		if (ret < 0 && ret != -EINVAL)
+			return ret;
+		else if (ret >= 0)
+			return ret;
+#endif
 	}
 
 	ret = kvm_psci_call(vcpu);

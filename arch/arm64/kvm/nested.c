@@ -19,6 +19,7 @@
 #include <linux/kvm_host.h>
 
 #include <asm/kvm_emulate.h>
+#include <asm/kvm_nested_pv.h>
 
 static bool nested_param;
 
@@ -42,6 +43,27 @@ bool nested_virt_in_use(struct kvm_vcpu *vcpu)
 		return true;
 
 	return false;
+}
+
+/* We forward all hvc instruction to the guest hypervisor. */
+int handle_hvc_nested(struct kvm_vcpu *vcpu)
+{
+	/* Handle pv hvc call from virtual EL2 */
+	if (vcpu_mode_el2(vcpu))
+		return handle_pv(vcpu);
+
+	/*
+	 * This is only to check If this is a PSCI call from the guest.
+	 * What we should do is to paravirtualize smc call from the guest
+	 * (because otherwise it will be undefined on m400), then handle that
+	 * as a psci call.
+	 */
+	if (!vcpu_mode_el2(vcpu) && !vcpu_nested_stage2_enabled(vcpu) &&
+	    !kvm_vcpu_hvc_get_imm(vcpu))
+		return -EINVAL;
+
+	/* The guest hypervisor will take care of the rest */
+	return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
 }
 
 /*
