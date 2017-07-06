@@ -303,4 +303,15 @@ static inline int __init kvmarm_nested_cfg(char *buf)
 {
 	return 0;
 }
+
+static inline int init_nested_virt(void)
+{
+	return 0;
+}
+
+static inline bool nested_virt_in_use(struct kvm_vcpu *vcpu)
+{
+	return false;
+}
+
 #endif /* __ARM_KVM_HOST_H__ */
