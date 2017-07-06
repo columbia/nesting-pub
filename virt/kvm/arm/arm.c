@@ -1531,6 +1531,10 @@ int kvm_arch_init(void *opaque)
 			goto out_err;
 	}
 
+	err = init_nested_virt();
+	if (err)
+		return err;
+
 	err = init_subsystems();
 	if (err)
 		goto out_hyp;
