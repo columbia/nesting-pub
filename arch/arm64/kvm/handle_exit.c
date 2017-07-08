@@ -216,6 +216,24 @@ static int kvm_handle_eret(struct kvm_vcpu *vcpu, struct kvm_run *run)
 	*vcpu_pc(vcpu) = vcpu_el2_sreg(vcpu, ELR_EL2);
 	*vcpu_cpsr(vcpu) = vcpu_el2_sreg(vcpu, SPSR_EL2);
 
+	/*
+	 * When a VHE host kernel running in a VM returns to itself, the vcpu
+	 * mode should stay in the virtual EL2. However, the target exception
+	 * level stored in the virtual SPSR_EL2 can be EL1; The target EL
+	 * is set when the VHE host kernel is taking an exception to itself,
+	 * and it is the physical EL1. We set it back to the virtual EL2 mode.
+	 */
+	if (vcpu_mode_el1(vcpu) && vcpu_el2_e2h_is_set(vcpu)
+	    && vcpu_el2_tge_is_set(vcpu)) {
+		u32 mode = *vcpu_cpsr(vcpu) & PSR_MODE_MASK;
+
+		*vcpu_cpsr(vcpu) &= ~PSR_MODE_MASK;
+		if (mode == PSR_MODE_EL1h)
+			*vcpu_cpsr(vcpu) |= PSR_MODE_EL2h;
+		else
+			*vcpu_cpsr(vcpu) |= PSR_MODE_EL2t;
+	}
+
 	return 1;
 }
 
