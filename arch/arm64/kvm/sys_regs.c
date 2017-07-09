@@ -911,6 +911,42 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
 	{ SYS_DESC(SYS_PMEVTYPERn_EL0(n)),					\
 	  access_pmu_evtyper, reset_unknown, (PMEVTYPER0_EL0 + n), }
 
+static bool access_cntv_tval(struct kvm_vcpu *vcpu,
+		struct sys_reg_params *p,
+		const struct sys_reg_desc *r)
+{
+
+	/* To be done with timer patch series */
+	return true;
+}
+
+static bool access_cntv_ctl(struct kvm_vcpu *vcpu,
+		struct sys_reg_params *p,
+		const struct sys_reg_desc *r)
+{
+	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+
+	if (p->is_write)
+		vtimer->cnt_ctl = p->regval;
+	else
+		p->regval = vtimer->cnt_ctl;
+
+	return true;
+}
+
+static bool access_cntv_cval(struct kvm_vcpu *vcpu,
+		struct sys_reg_params *p,
+		const struct sys_reg_desc *r)
+{
+	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+
+	if (p->is_write)
+		vtimer->cnt_cval = p->regval;
+	else
+		p->regval = vtimer->cnt_cval;
+
+	return true;
+}
 static bool access_cntp_tval(struct kvm_vcpu *vcpu,
 		struct sys_reg_params *p,
 		const struct sys_reg_desc *r)
@@ -1639,6 +1675,14 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 	{ SYS_DESC(vbar_EL12), access_vbar, reset_val, VBAR_EL1, 0 },
 	{ SYS_DESC(contextidr_EL12), access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
 	{ SYS_DESC(cntkctl_EL12), access_cntkctl_el12, reset_val, CNTKCTL_EL1, 0 },
+
+	{ SYS_DESC(cntp_tval_EL02), access_cntp_tval },
+	{ SYS_DESC(cntp_ctl_EL02), access_cntp_ctl },
+	{ SYS_DESC(cntp_cval_EL02), access_cntp_cval },
+
+	{ SYS_DESC(cntv_tval_EL02), access_cntv_tval },
+	{ SYS_DESC(cntv_ctl_EL02), access_cntv_ctl },
+	{ SYS_DESC(cntv_cval_EL02), access_cntv_cval },
 
 	{ SYS_DESC(SYS_SP_EL2), NULL, reset_special, SP_EL2, 0},
 };
