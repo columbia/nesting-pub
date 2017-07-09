@@ -73,30 +73,6 @@
 #define read_sysreg_el1(r)	read_sysreg_elx(r, _EL1, _EL12)
 #define write_sysreg_el1(v,r)	write_sysreg_elx(v, r, _EL1, _EL12)
 
-/* The VHE specific system registers and their encoding */
-#define sctlr_EL12              sys_reg(3, 5, 1, 0, 0)
-#define cpacr_EL12              sys_reg(3, 5, 1, 0, 2)
-#define ttbr0_EL12              sys_reg(3, 5, 2, 0, 0)
-#define ttbr1_EL12              sys_reg(3, 5, 2, 0, 1)
-#define tcr_EL12                sys_reg(3, 5, 2, 0, 2)
-#define afsr0_EL12              sys_reg(3, 5, 5, 1, 0)
-#define afsr1_EL12              sys_reg(3, 5, 5, 1, 1)
-#define esr_EL12                sys_reg(3, 5, 5, 2, 0)
-#define far_EL12                sys_reg(3, 5, 6, 0, 0)
-#define mair_EL12               sys_reg(3, 5, 10, 2, 0)
-#define amair_EL12              sys_reg(3, 5, 10, 3, 0)
-#define vbar_EL12               sys_reg(3, 5, 12, 0, 0)
-#define contextidr_EL12         sys_reg(3, 5, 13, 0, 1)
-#define cntkctl_EL12            sys_reg(3, 5, 14, 1, 0)
-#define cntp_tval_EL02          sys_reg(3, 5, 14, 2, 0)
-#define cntp_ctl_EL02           sys_reg(3, 5, 14, 2, 1)
-#define cntp_cval_EL02          sys_reg(3, 5, 14, 2, 2)
-#define cntv_tval_EL02          sys_reg(3, 5, 14, 3, 0)
-#define cntv_ctl_EL02           sys_reg(3, 5, 14, 3, 1)
-#define cntv_cval_EL02          sys_reg(3, 5, 14, 3, 2)
-#define spsr_EL12               sys_reg(3, 5, 4, 0, 0)
-#define elr_EL12                sys_reg(3, 5, 4, 0, 1)
-
 /**
  * hyp_alternate_select - Generates patchable code sequences that are
  * used to switch between two implementations of a function, depending

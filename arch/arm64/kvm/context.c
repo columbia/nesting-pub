@@ -121,6 +121,13 @@ static void copy_shadow_non_trap_el1_state(struct kvm_vcpu *vcpu, bool setup)
 	for (i = 0; i < ARRAY_SIZE(el1_non_trap_regs); i++) {
 		const int sr = el1_non_trap_regs[i];
 
+		/*
+		 * We trap on cntkctl_el12 accesses from virtual EL2 as suppose
+		 * to not trapping on cntlctl_el1 accesses.
+		 */
+		if (vcpu_el2_e2h_is_set(vcpu) && sr == CNTKCTL_EL1)
+			continue;
+
 		if (setup)
 			s_sys_regs[sr] = vcpu_sys_reg(vcpu, sr);
 		else
