@@ -905,6 +905,14 @@ static inline void access_rw(struct sys_reg_params *p, u64 *sysreg)
 		*sysreg = p->regval;
 }
 
+static bool access_cntkctl_el12(struct kvm_vcpu *vcpu,
+			 struct sys_reg_params *p,
+			 const struct sys_reg_desc *r)
+{
+	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
+	return true;
+}
+
 static u64 *get_special_reg(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
 {
 	u64 reg = sys_reg(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
@@ -1200,6 +1208,23 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 
 	{ SYS_DESC(SYS_CNTVOFF_EL2), trap_el2_regs, reset_val, CNTVOFF_EL2, 0 },
 	{ SYS_DESC(SYS_CNTHCTL_EL2), trap_el2_regs, reset_val, CNTHCTL_EL2, 0 },
+
+	{ SYS_DESC(sctlr_EL12), access_vm_reg, reset_val, SCTLR_EL1, 0x00C50078 },
+	{ SYS_DESC(cpacr_EL12), access_cpacr, reset_val, CPACR_EL1, 0 },
+	{ SYS_DESC(ttbr0_EL12), access_vm_reg, reset_unknown, TTBR0_EL1 },
+	{ SYS_DESC(ttbr1_EL12), access_vm_reg, reset_unknown, TTBR1_EL1 },
+	{ SYS_DESC(tcr_EL12), access_vm_reg, reset_val, TCR_EL1, 0 },
+	{ SYS_DESC(spsr_EL12), access_spsr},
+	{ SYS_DESC(elr_EL12), access_elr},
+	{ SYS_DESC(afsr0_EL12), access_vm_reg, reset_unknown, AFSR0_EL1 },
+	{ SYS_DESC(afsr1_EL12), access_vm_reg, reset_unknown, AFSR1_EL1 },
+	{ SYS_DESC(esr_EL12), access_vm_reg, reset_unknown, ESR_EL1 },
+	{ SYS_DESC(far_EL12), access_vm_reg, reset_unknown, FAR_EL1 },
+	{ SYS_DESC(mair_EL12), access_vm_reg, reset_unknown, MAIR_EL1 },
+	{ SYS_DESC(amair_EL12), access_vm_reg, reset_amair_el1, AMAIR_EL1 },
+	{ SYS_DESC(vbar_EL12), access_vbar, reset_val, VBAR_EL1, 0 },
+	{ SYS_DESC(contextidr_EL12), access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
+	{ SYS_DESC(cntkctl_EL12), access_cntkctl_el12, reset_val, CNTKCTL_EL1, 0 },
 
 	{ SYS_DESC(SYS_SP_EL2), NULL, reset_special, SP_EL2, 0},
 };
