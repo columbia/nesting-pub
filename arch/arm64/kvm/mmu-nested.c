@@ -427,7 +427,7 @@ struct kvm_s2_mmu *vcpu_get_active_s2_mmu(struct kvm_vcpu *vcpu)
 		return &vcpu->kvm->arch.mmu;
 
 	/* If we are NOT entering the nested VM, return mmu in kvm_arch */
-	if (vcpu_mode_el2(vcpu) || !vcpu_nested_stage2_enabled(vcpu))
+	if (is_hyp_ctxt(vcpu) || !vcpu_nested_stage2_enabled(vcpu))
 		return &vcpu->kvm->arch.mmu;
 
 	/* Otherwise, search for nested_mmu in the list */

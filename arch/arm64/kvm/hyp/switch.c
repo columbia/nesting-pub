@@ -113,6 +113,7 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
 	}
 
 	write_sysreg(val, hcr_el2);
+
 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
 	write_sysreg(1 << 15, hstr_el2);
 	/*

@@ -374,7 +374,7 @@ static inline struct kvm_s2_vmid *vcpu_get_active_vmid(struct kvm_vcpu *vcpu)
 {
 	struct kvm_s2_mmu *mmu = vcpu_get_active_s2_mmu(vcpu);
 
-	if (unlikely(vcpu_mode_el2(vcpu)))
+	if (unlikely(is_hyp_ctxt(vcpu)))
 		return &mmu->el2_vmid;
 	else
 		return &mmu->vmid;

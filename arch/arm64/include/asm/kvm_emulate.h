@@ -422,7 +422,7 @@ static inline bool kvm_is_shadow_s2_fault(struct kvm_vcpu *vcpu)
 	if (!nested_virt_in_use(vcpu))
 		return false;
 
-	return (!vcpu_mode_el2(vcpu)) && vcpu_nested_stage2_enabled(vcpu);
+	return (!is_hyp_ctxt(vcpu)) && vcpu_nested_stage2_enabled(vcpu);
 }
 
 /* Return the guest hypervisor's cntvoff value */
