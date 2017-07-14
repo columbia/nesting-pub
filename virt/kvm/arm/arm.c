@@ -472,6 +472,10 @@ static bool need_new_vmid_gen(struct kvm_s2_vmid *vmid)
  */
 static void update_vttbr(struct kvm *kvm, struct kvm_s2_vmid *vmid)
 {
+	struct kvm_s2_mmu *mmu = &kvm->arch.mmu;
+	struct kvm_vcpu *vcpu;
+	int i = 0;
+
 	if (!need_new_vmid_gen(vmid))
 		return;
 
@@ -510,6 +514,14 @@ static void update_vttbr(struct kvm *kvm, struct kvm_s2_vmid *vmid)
 	vmid->vmid = kvm_next_vmid;
 	kvm_next_vmid++;
 	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
+
+	/*
+	 * Update hw_vttbr with new vmid. This is necessary for 32bit ARM.
+	 * On ARM64, we set hw_vttbr for every entry to a VM.
+	 */
+	kvm_for_each_vcpu(i, vcpu, kvm) {
+		vcpu->arch.hw_vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
+	}
 
 	spin_unlock(&kvm_vmid_lock);
 }
