@@ -86,6 +86,58 @@ static void flush_shadow_el1_sysregs(struct kvm_vcpu *vcpu)
 	s_sys_regs[CPACR_EL1] = cptr_to_cpacr(vcpu_sys_reg(vcpu, CPTR_EL2));
 }
 
+
+/*
+ * List of EL0 and EL1 registers which we allow the virtual EL2 mode to access
+ * directly without trapping. This is possible because the impact of
+ * accessing those registers are the same regardless of the exception
+ * levels that are allowed.
+ */
+static const int el1_non_trap_regs[] = {
+	CNTKCTL_EL1,
+	CSSELR_EL1,
+	PAR_EL1,
+	TPIDR_EL0,
+	TPIDR_EL1,
+	TPIDRRO_EL0
+};
+
+/**
+ * copy_shadow_non_trap_el1_state
+ * @vcpu:      The VCPU pointer
+ * @setup:     True, if on the way to the guest (called from setup)
+ *             False, if returning form the guet (calld from restore)
+ *
+ * Some EL1 registers are accessed directly by the virtual EL2 mode because
+ * they in no way affect execution state in virtual EL2.   However, we must
+ * still ensure that virtual EL2 observes the same state of the EL1 registers
+ * as the normal VM's EL1 mode, so copy this state as needed on setup/restore.
+ */
+static void copy_shadow_non_trap_el1_state(struct kvm_vcpu *vcpu, bool setup)
+{
+	u64 *s_sys_regs = vcpu->arch.ctxt.shadow_sys_regs;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(el1_non_trap_regs); i++) {
+		const int sr = el1_non_trap_regs[i];
+
+		if (setup)
+			s_sys_regs[sr] = vcpu_sys_reg(vcpu, sr);
+		else
+			vcpu_sys_reg(vcpu, sr) = s_sys_regs[sr];
+	}
+}
+
+static void sync_shadow_non_trap_el1_state(struct kvm_vcpu *vcpu)
+{
+	copy_shadow_non_trap_el1_state(vcpu, false);
+}
+
+static void flush_shadow_non_trap_el1_state(struct kvm_vcpu *vcpu)
+{
+	copy_shadow_non_trap_el1_state(vcpu, true);
+}
+
 static void flush_shadow_special_regs(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
@@ -162,6 +214,7 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
 	if (unlikely(vcpu_mode_el2(vcpu))) {
 		flush_shadow_special_regs(vcpu);
 		flush_shadow_el1_sysregs(vcpu);
+		flush_shadow_non_trap_el1_state(vcpu);
 		ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
 	} else {
 		flush_special_regs(vcpu);
@@ -176,9 +229,10 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
  */
 void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
 {
-	if (unlikely(vcpu_mode_el2(vcpu)))
+	if (unlikely(vcpu_mode_el2(vcpu))) {
 		sync_shadow_special_regs(vcpu);
-	else
+		sync_shadow_non_trap_el1_state(vcpu);
+	} else
 		sync_special_regs(vcpu);
 }
 
