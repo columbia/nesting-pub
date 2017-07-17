@@ -98,12 +98,15 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
 		val |= HCR_TID3; /* TID3: trap feature register accesses */
 
 	if (is_hyp_ctxt(vcpu)) {
+		val |= (HCR_NV | HCR_TID3);
+
 		/*
 		 * For a guest hypervisor on v8.0, trap and emulate the EL1
-		 * virtual memory control register accesses.
+		 * virtual memory control register and three registers
+		 * controlled by NV1 bit.
 		 */
 		if (!vcpu_el2_e2h_is_set(vcpu))
-			val |= HCR_TVM | HCR_TRVM;
+			val |= HCR_TVM | HCR_TRVM | HCR_NV1;
 		/*
 		 * For a guest hypervisor on v8.1 (VHE), allow to access the
 		 * EL1 virtual memory control registers natively. These accesses
