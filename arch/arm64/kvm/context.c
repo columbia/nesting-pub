@@ -66,7 +66,7 @@ static inline u64 tcr_el2_ips_to_tcr_el1_ps(u64 tcr_el2)
 		<< TCR_IPS_SHIFT;
 }
 
-static inline u64 cptr_to_cpacr(u64 cptr_el2)
+u64 cptr_to_cpacr(u64 cptr_el2)
 {
 	u64 cpacr_el1 = 0;
 
@@ -76,6 +76,21 @@ static inline u64 cptr_to_cpacr(u64 cptr_el2)
 		cpacr_el1 |= CPACR_EL1_TTA;
 
 	return cpacr_el1;
+}
+
+u64 cpacr_to_cptr(u64 cpacr_el1)
+{
+	u64 cptr_el2;
+
+	cptr_el2 = CPTR_EL2_DEFAULT;
+	if (!(cpacr_el1 & CPACR_EL1_FPEN))
+		cptr_el2 |= CPTR_EL2_TFP;
+	if (cpacr_el1 & CPACR_EL1_TTA)
+		cptr_el2 |= CPTR_EL2_TTA;
+	if (cpacr_el1 & CPTR_EL2_TCPAC)
+		cptr_el2 |= CPTR_EL2_TCPAC;
+
+	return cptr_el2;
 }
 
 static void sync_shadow_el1_sysregs(struct kvm_vcpu *vcpu)
@@ -93,8 +108,12 @@ static void sync_shadow_el1_sysregs(struct kvm_vcpu *vcpu)
 
 	for (i = 0; i < ARRAY_SIZE(vhe_map); i++) {
 		const struct el1_el2_map *map = &vhe_map[i];
+		u64 *el2_reg = &vcpu_sys_reg(vcpu, map->el2);
 
-		vcpu_sys_reg(vcpu, map->el2) = s_sys_regs[map->el1];
+		/* We do trap-and-emulate CPACR_EL1 accesses. So, don't sync */
+		if (map->el2 == CPTR_EL2)
+			continue;
+		*el2_reg = s_sys_regs[map->el1];
 	}
 }
 
@@ -138,8 +157,12 @@ static void flush_shadow_el1_sysregs_vhe(struct kvm_vcpu *vcpu)
 	 */
 	for (i = 0; i < ARRAY_SIZE(vhe_map); i++) {
 		const struct el1_el2_map *map = &vhe_map[i];
+		u64 *el1_reg = &s_sys_regs[map->el1];
 
-		s_sys_regs[map->el1] = vcpu_sys_reg(vcpu, map->el2);
+		if (map->el2 == CPTR_EL2)
+			*el1_reg = cptr_to_cpacr(vcpu_sys_reg(vcpu, map->el2));
+		else
+			*el1_reg = vcpu_sys_reg(vcpu, map->el2);
 	}
 }
 
