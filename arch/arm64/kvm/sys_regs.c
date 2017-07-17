@@ -1091,6 +1091,11 @@ static bool access_cpacr(struct kvm_vcpu *vcpu,
 	if (el12_reg(p) && forward_nv_traps(vcpu))
 		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
 
+	/* Forward this trap to the virtual EL2 if CPTR_EL2.TCPAC is set*/
+	if (!el12_reg(p) && !vcpu_mode_el2(vcpu) &&
+	    (vcpu_sys_reg(vcpu, CPTR_EL2) & CPTR_EL2_TCPAC))
+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+
 	/*
 	 * When the virtual HCR_EL2.E2H == 1, an access to CPACR_EL1
 	 * in the virtual EL2 is to access CPTR_EL2.
