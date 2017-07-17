@@ -900,15 +900,33 @@ static inline void access_rw(struct sys_reg_params *p, u64 *sysreg)
 		*sysreg = p->regval;
 }
 
+static u64 *get_special_reg(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
+{
+	u64 reg = sys_reg(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
+
+	switch (reg) {
+	case SYS_SP_EL1:
+		return &vcpu->arch.ctxt.gp_regs.sp_el1;
+	case SYS_ELR_EL2:
+		return &vcpu_el2_sreg(vcpu, ELR_EL2);
+	case SYS_SPSR_EL2:
+		return &vcpu_el2_sreg(vcpu, SPSR_EL2);
+	default:
+		return NULL;
+	};
+}
+
 static bool trap_el2_regs(struct kvm_vcpu *vcpu,
 			 struct sys_reg_params *p,
 			 const struct sys_reg_desc *r)
 {
-	/* SP_EL1 is NOT maintained in sys_regs array */
-	if (sys_reg(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2) == SYS_SP_EL1)
-		access_rw(p, &vcpu->arch.ctxt.gp_regs.sp_el1);
-	else
-		access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
+	u64 *sys_reg;
+
+	sys_reg = get_special_reg(vcpu, p);
+	if (!sys_reg)
+		sys_reg = &vcpu_sys_reg(vcpu, r->reg);
+
+	access_rw(p, sys_reg);
 
 	return true;
 }
@@ -1116,6 +1134,8 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 
 	{ SYS_DESC(SYS_DACR32_EL2), NULL, reset_unknown, DACR32_EL2 },
 
+	{ SYS_DESC(SYS_SPSR_EL2), trap_el2_regs, reset_special, SPSR_EL2, 0 },
+	{ SYS_DESC(SYS_ELR_EL2), trap_el2_regs, reset_special, ELR_EL2, 0 },
 	{ SYS_DESC(SYS_SP_EL1), trap_el2_regs },
 
 	{ SYS_DESC(SYS_IFSR32_EL2), NULL, reset_unknown, IFSR32_EL2 },
@@ -1138,6 +1158,8 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 
 	{ SYS_DESC(SYS_CNTVOFF_EL2), trap_el2_regs, reset_val, CNTVOFF_EL2, 0 },
 	{ SYS_DESC(SYS_CNTHCTL_EL2), trap_el2_regs, reset_val, CNTHCTL_EL2, 0 },
+
+	{ SYS_DESC(SYS_SP_EL2), NULL, reset_special, SP_EL2, 0},
 };
 
 static bool trap_dbgidr(struct kvm_vcpu *vcpu,
@@ -2271,6 +2293,8 @@ void kvm_reset_sys_regs(struct kvm_vcpu *vcpu)
 
 	/* Catch someone adding a register without putting in reset entry. */
 	memset(&vcpu->arch.ctxt.sys_regs, 0x42, sizeof(vcpu->arch.ctxt.sys_regs));
+	memset(&vcpu->arch.ctxt.el2_special_regs, 0x42,
+	       sizeof(vcpu->arch.ctxt.el2_special_regs));
 
 	/* Generic chip reset first (so target could override). */
 	reset_sys_reg_descs(vcpu, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
@@ -2281,4 +2305,8 @@ void kvm_reset_sys_regs(struct kvm_vcpu *vcpu)
 	for (num = 1; num < NR_SYS_REGS; num++)
 		if (vcpu_sys_reg(vcpu, num) == 0x4242424242424242)
 			panic("Didn't reset vcpu_sys_reg(%zi)", num);
+
+	for (num = 1; num < NR_EL2_SPECIAL_REGS; num++)
+		if (vcpu_el2_sreg(vcpu, num) == 0x4242424242424242)
+			panic("Didn't reset vcpu_el2_sreg(%zi)", num);
 }

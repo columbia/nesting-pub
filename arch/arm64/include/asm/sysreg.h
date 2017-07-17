@@ -268,6 +268,8 @@
 
 #define SYS_DACR32_EL2			sys_reg(3, 4, 3, 0, 0)
 
+#define SYS_SPSR_EL2			sys_reg(3, 4, 4, 0, 0)
+#define SYS_ELR_EL2			sys_reg(3, 4, 4, 0, 1)
 #define SYS_SP_EL1			sys_reg(3, 4, 4, 1, 0)
 
 #define SYS_IFSR32_EL2			sys_reg(3, 4, 5, 0, 1)
@@ -331,6 +333,8 @@
 
 #define SYS_CNTVOFF_EL2			sys_reg(3, 4, 14, 0, 3)
 #define SYS_CNTHCTL_EL2			sys_reg(3, 4, 14, 1, 0)
+
+#define SYS_SP_EL2			sys_reg(3, 6, 4, 1, 0)
 
 /* Common SCTLR_ELx flags. */
 #define SCTLR_ELx_EE    (1 << 25)
