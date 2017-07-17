@@ -59,6 +59,8 @@ int kvm_inject_nested_sync(struct kvm_vcpu *vcpu, u64 esr_el2);
 void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu);
 void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu);
 void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt);
+u64 cptr_to_cpacr(u64 cptr_el2);
+u64 cpacr_to_cptr(u64 cpacr_el1);
 
 static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
 {

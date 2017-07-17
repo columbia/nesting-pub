@@ -972,7 +972,23 @@ static bool access_cpacr(struct kvm_vcpu *vcpu,
 		struct sys_reg_params *p,
 		const struct sys_reg_desc *r)
 {
-	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
+	u64 reg = sys_reg(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
+
+	/*
+	 * When the virtual HCR_EL2.E2H == 1, an access to CPACR_EL1
+	 * in the virtual EL2 is to access CPTR_EL2.
+	 */
+	if (vcpu_el2_e2h_is_set(vcpu) && (reg == SYS_CPACR_EL1)) {
+		u64 *sysreg = &vcpu_sys_reg(vcpu, CPTR_EL2);
+
+		/* We keep the value in ARMv8.0 CPTR_EL2 format. */
+		if (!p->is_write)
+			p->regval = cptr_to_cpacr(*sysreg);
+		else
+			*sysreg	= cpacr_to_cptr(p->regval);
+	} else /* CPACR_EL1 access with E2H == 0 or CPACR_EL12 access */
+		access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
+
 	return true;
 }
 
