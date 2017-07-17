@@ -150,6 +150,9 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
 	int i;
 	const struct el1_el2_map *map;
 
+	if (el12_reg(p) && forward_nv_traps(vcpu))
+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+
 	/*
 	 * Redirect EL1 register accesses to the corresponding EL2 registers if
 	 * they are meant to access EL2 registers.
@@ -1087,6 +1090,9 @@ static bool access_cntkctl_el12(struct kvm_vcpu *vcpu,
 			 struct sys_reg_params *p,
 			 const struct sys_reg_desc *r)
 {
+	if (forward_nv_traps(vcpu))
+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+
 	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
 	return true;
 }
@@ -1133,6 +1139,9 @@ static bool access_elr(struct kvm_vcpu *vcpu,
 		struct sys_reg_params *p,
 		const struct sys_reg_desc *r)
 {
+	if (el12_reg(p) && forward_nv_traps(vcpu))
+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+
 	access_rw(p, &vcpu->arch.ctxt.gp_regs.elr_el1);
 	return true;
 }
@@ -1141,6 +1150,9 @@ static bool access_spsr(struct kvm_vcpu *vcpu,
 		struct sys_reg_params *p,
 		const struct sys_reg_desc *r)
 {
+	if (el12_reg(p) && forward_nv_traps(vcpu))
+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+
 	access_rw(p, &vcpu->arch.ctxt.gp_regs.spsr[KVM_SPSR_EL1]);
 	return true;
 }
@@ -1149,6 +1161,9 @@ static bool access_vbar(struct kvm_vcpu *vcpu,
 		struct sys_reg_params *p,
 		const struct sys_reg_desc *r)
 {
+	if (el12_reg(p) && forward_nv_traps(vcpu))
+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+
 	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
 	return true;
 }
@@ -1158,6 +1173,9 @@ static bool access_cpacr(struct kvm_vcpu *vcpu,
 		const struct sys_reg_desc *r)
 {
 	u64 reg = sys_reg(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
+
+	if (el12_reg(p) && forward_nv_traps(vcpu))
+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
 
 	/*
 	 * When the virtual HCR_EL2.E2H == 1, an access to CPACR_EL1
