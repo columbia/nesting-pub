@@ -171,6 +171,15 @@ enum vcpu_sysreg {
 	NR_SYS_REGS	/* Nothing after this line! */
 };
 
+enum el2_special_regs {
+	__INVALID_EL2_SPECIAL_REG__,
+	SPSR_EL2,	/* Saved Program Status Register (EL2) */
+	ELR_EL2,	/* Exception Link Register (EL2) */
+	SP_EL2,		/* Stack Pointer (EL2) */
+
+	NR_EL2_SPECIAL_REGS
+};
+
 /* 32bit mapping */
 #define c0_MPIDR	(MPIDR_EL1 * 2)	/* MultiProcessor ID Register */
 #define c0_CSSELR	(CSSELR_EL1 * 2)/* Cache Size Selection Register */
@@ -218,6 +227,8 @@ struct kvm_cpu_context {
 		u64 sys_regs[NR_SYS_REGS];
 		u32 copro[NR_COPRO_REGS];
 	};
+
+	u64 el2_special_regs[NR_EL2_SPECIAL_REGS];
 };
 
 typedef struct kvm_cpu_context kvm_cpu_context_t;
@@ -307,6 +318,7 @@ struct kvm_vcpu_arch {
 
 #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
 #define vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
+#define vcpu_el2_sreg(v,r)	((v)->arch.ctxt.el2_special_regs[(r)])
 /*
  * CP14 and CP15 live in the same array, as they are backed by the
  * same system registers.
