@@ -61,6 +61,12 @@ static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
 {
 	int ret;
 
+	/*
+	 * Forward this trapped smc instruction to the virtual EL2.
+	 */
+	if (forward_nv_traps(vcpu) && (vcpu_sys_reg(vcpu, HCR_EL2) & HCR_TSC))
+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+
 	/* If imm is non-zero, it's not defined */
 	if (kvm_vcpu_hvc_get_imm(vcpu)) {
 		kvm_inject_undefined(vcpu);
@@ -195,6 +201,13 @@ static int kvm_handle_eret(struct kvm_vcpu *vcpu, struct kvm_run *run)
 {
 	trace_kvm_nested_eret(vcpu, vcpu_el2_sreg(vcpu, ELR_EL2),
 			      vcpu_el2_sreg(vcpu, SPSR_EL2));
+
+	/*
+	 * Forward this trap to the virtual EL2 if the virtual HCR_EL2.NV
+	 * bit is set.
+	 */
+	if (forward_nv_traps(vcpu))
+		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
 
 	/*
 	 * Note that the current exception level is always the virtual EL2,
