@@ -1,0 +1,3 @@
+v1-->v2:
+Check if nested virtualization is enabled before jumping into nested
+virtualization specific code.
