@@ -1,0 +1,3 @@
+v1-->v2:
+Check TFP bit explicitly in the fpsimd trap handler, since this
+handler is also used when there's no FP/ASIMD support.
