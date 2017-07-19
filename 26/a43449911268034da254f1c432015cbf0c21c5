@@ -1,0 +1,2 @@
+v1-->v2:
+Initialized host_context->hw_sys_regs for the host hypervisor on VHE systems

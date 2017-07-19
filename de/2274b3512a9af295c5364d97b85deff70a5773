@@ -1,0 +1,5 @@
+v1-->v2:
+Set MPIDR_EL1 when nested virtualization is in use.
+Cleaned up comments mentioning paravirtualization.
+Christoffer suggested to change the file name. Need to discuss it along with
+other newly created files.

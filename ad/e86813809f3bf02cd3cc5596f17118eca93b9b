@@ -1,0 +1,8 @@
+v1-->v2:
+Allowed to inject exceptions while the current exception level is virtual EL2.
+Moved code to inject irqs to a later patch.
+Added Linaro in the copyright.
+
+This commit can be improved by creating an unified function to get the
+exception vector regardless of the target exception level. This function
+can be reused in inject_fault.c
