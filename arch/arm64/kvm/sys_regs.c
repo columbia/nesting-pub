@@ -1778,6 +1778,23 @@ static bool handle_alle2is(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
 	return true;
 }
 
+static bool handle_vae2(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+		       const struct sys_reg_desc *r)
+{
+	struct kvm_s2_mmu *mmu = &vcpu->kvm->arch.mmu;
+	u64 vttbr = kvm_get_vttbr(&mmu->el2_vmid, mmu);
+	int sys_encoding = sys_insn(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
+
+	/*
+	 * Based on the same principle as TLBI ALLE2 instruction emulation, we
+	 * emulate TLBI VAE2* instructions by executing corresponding TLBI VAE1*
+	 * instructions with the virtual EL2's VMID assigned by the host
+	 * hypervisor.
+	 */
+	kvm_call_hyp(__kvm_tlb_vae2, vttbr, p->regval, sys_encoding);
+	return true;
+}
+
 /*
  * AT instruction emulation
  *
@@ -1862,16 +1879,16 @@ static struct sys_reg_desc sys_insn_descs[] = {
 	SYS_INSN_TO_DESC(TLBI_IPAS2E1IS, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_IPAS2LE1IS, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_ALLE2IS, handle_alle2is, NULL),
-	SYS_INSN_TO_DESC(TLBI_VAE2IS, NULL, NULL),
+	SYS_INSN_TO_DESC(TLBI_VAE2IS, handle_vae2, NULL),
 	SYS_INSN_TO_DESC(TLBI_ALLE1IS, NULL, NULL),
-	SYS_INSN_TO_DESC(TLBI_VALE2IS, NULL, NULL),
+	SYS_INSN_TO_DESC(TLBI_VALE2IS, handle_vae2, NULL),
 	SYS_INSN_TO_DESC(TLBI_VMALLS12E1IS, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_IPAS2E1, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_IPAS2LE1, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_ALLE2, handle_alle2, NULL),
-	SYS_INSN_TO_DESC(TLBI_VAE2, NULL, NULL),
+	SYS_INSN_TO_DESC(TLBI_VAE2, handle_vae2, NULL),
 	SYS_INSN_TO_DESC(TLBI_ALLE1, NULL, NULL),
-	SYS_INSN_TO_DESC(TLBI_VALE2, NULL, NULL),
+	SYS_INSN_TO_DESC(TLBI_VALE2, handle_vae2, NULL),
 	SYS_INSN_TO_DESC(TLBI_VMALLS12E1, NULL, NULL),
 };
 

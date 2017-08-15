@@ -151,3 +151,31 @@ void __hyp_text __kvm_flush_vm_context(void)
 	asm volatile("ic ialluis" : : );
 	dsb(ish);
 }
+
+void __hyp_text __kvm_tlb_vae2(u64 vttbr, u64 va, u64 sys_encoding)
+{
+	/* Switch to requested VMID */
+	__tlb_switch_to_guest()(vttbr);
+
+	/* Execute the EL1 version of TLBI VAE2* instruction */
+	switch (sys_encoding) {
+	case TLBI_VAE2IS:
+		__tlbi(vae1is, va);
+		break;
+	case TLBI_VALE2IS:
+		__tlbi(vale1is, va);
+		break;
+	case TLBI_VAE2:
+		__tlbi(vae1, va);
+		break;
+	case TLBI_VALE2:
+		__tlbi(vale1, va);
+		break;
+	default:
+		break;
+	}
+	dsb(nsh);
+	isb();
+
+	__tlb_switch_to_host()();
+}
