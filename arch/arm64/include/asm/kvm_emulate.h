@@ -185,6 +185,17 @@ static inline bool vcpu_el2_tge_is_set(const struct kvm_vcpu *vcpu)
 	return (vcpu_sys_reg(vcpu, HCR_EL2) & HCR_TGE);
 }
 
+
+/*
+ * When the NV and NV1 bits are set, the EL2 page table format is used for the
+ * EL1 translation regime.
+ */
+static inline bool vcpu_el2_format_used(const struct kvm_vcpu *vcpu)
+{
+	return ((vcpu_sys_reg(vcpu, HCR_EL2) & HCR_NV) &&
+		(vcpu_sys_reg(vcpu, HCR_EL2) & HCR_NV1));
+}
+
 static inline bool is_hyp_ctxt(const struct kvm_vcpu *vcpu)
 {
 	/*

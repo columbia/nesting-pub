@@ -1621,6 +1621,26 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 	{ SYS_DESC(SYS_SP_EL2), NULL, reset_special, SP_EL2, 0},
 };
 
+static bool handle_s1e01(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+			 const struct sys_reg_desc *r)
+{
+	struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
+	bool el2_format;
+	int sys_encoding = sys_insn(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
+
+	/* See '2. EL0/EL1 AT instructions: S1E[01]x, S12E1x' table. */
+	if (vcpu_el2_e2h_is_set(vcpu) && vcpu_el2_tge_is_set(vcpu))
+		ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
+	else
+		ctxt->hw_sys_regs = ctxt->sys_regs;
+
+	el2_format = vcpu_el2_format_used(vcpu);
+
+	kvm_call_hyp(__kvm_at_insn, vcpu, p->regval, el2_format, sys_encoding);
+
+	return true;
+}
+
 /*
  * AT instruction emulation
  *
@@ -1690,12 +1710,12 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 #define SYS_INSN_TO_DESC(insn, access_fn, forward_fn)	\
 	{ SYS_DESC((insn)), (access_fn), NULL, 0, 0, NULL, NULL, (forward_fn) }
 static struct sys_reg_desc sys_insn_descs[] = {
-	SYS_INSN_TO_DESC(AT_S1E1R, NULL, NULL),
-	SYS_INSN_TO_DESC(AT_S1E1W, NULL, NULL),
-	SYS_INSN_TO_DESC(AT_S1E0R, NULL, NULL),
-	SYS_INSN_TO_DESC(AT_S1E0W, NULL, NULL),
-	SYS_INSN_TO_DESC(AT_S1E1RP, NULL, NULL),
-	SYS_INSN_TO_DESC(AT_S1E1WP, NULL, NULL),
+	SYS_INSN_TO_DESC(AT_S1E1R, handle_s1e01, NULL),
+	SYS_INSN_TO_DESC(AT_S1E1W, handle_s1e01, NULL),
+	SYS_INSN_TO_DESC(AT_S1E0R, handle_s1e01, NULL),
+	SYS_INSN_TO_DESC(AT_S1E0W, handle_s1e01, NULL),
+	SYS_INSN_TO_DESC(AT_S1E1RP, handle_s1e01, NULL),
+	SYS_INSN_TO_DESC(AT_S1E1WP, handle_s1e01, NULL),
 	SYS_INSN_TO_DESC(AT_S1E2R, NULL, NULL),
 	SYS_INSN_TO_DESC(AT_S1E2W, NULL, NULL),
 	SYS_INSN_TO_DESC(AT_S12E1R, NULL, NULL),
