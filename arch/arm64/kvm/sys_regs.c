@@ -1656,6 +1656,97 @@ static bool handle_s1e2(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
 	return true;
 }
 
+static u64 setup_par_aborted(u32 esr)
+{
+	u64 par = 0;
+
+	/* S [9]: fault in the stage 2 translation */
+	par |= (1 << 9);
+	/* FST [6:1]: Fault status code  */
+	par |= (esr << 1);
+	/* F [0]: translation is aborted */
+	par |= 1;
+
+	return par;
+}
+
+static u64 setup_par_completed(struct kvm_vcpu *vcpu, struct kvm_s2_trans *out)
+{
+	u64 par, vtcr_sh0;
+
+	/* F [0]: Translation is completed successfully */
+	par = 0;
+	/* ATTR [63:56] */
+	par |= out->upper_attr;
+	/* PA [47:12] */
+	par |= out->output & GENMASK_ULL(11, 0);
+	/* RES1 [11] */
+	par |= (1UL << 11);
+	/* SH [8:7]: Shareability attribute */
+	vtcr_sh0 = vcpu_sys_reg(vcpu, VTCR_EL2) & VTCR_EL2_SH0_MASK;
+	par |= (vtcr_sh0 >> VTCR_EL2_SH0_SHIFT) << 7;
+
+	return par;
+}
+
+static bool handle_s12(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+		       const struct sys_reg_desc *r, bool write)
+{
+	u64 par, va;
+	u32 esr;
+	phys_addr_t ipa;
+	struct kvm_s2_trans out;
+	int ret;
+
+	/* Do the stage-1 translation */
+	handle_s1e01(vcpu, p, r);
+	par = vcpu_sys_reg(vcpu, PAR_EL1);
+	if (par & 1) {
+		/* The stage-1 translation aborted */
+		return true;
+	}
+
+	/* Do the stage-2 translation */
+	va = p->regval;
+	ipa = (par & GENMASK_ULL(47, 12)) | (va & GENMASK_ULL(11, 0));
+	out.esr = 0;
+	ret = kvm_walk_nested_s2(vcpu, ipa, &out);
+	if (ret < 0)
+		return false;
+
+	/* Check if the stage-2 PTW is aborted */
+	if (out.esr) {
+		esr = out.esr;
+		goto s2_trans_abort;
+	}
+
+	/* Check the access permission */
+	if ((!write && !out.readable) || (write && !out.writable)) {
+		esr = ESR_ELx_FSC_PERM;
+		esr |= out.level & 0x3;
+		goto s2_trans_abort;
+	}
+
+	vcpu_sys_reg(vcpu, PAR_EL1) = setup_par_completed(vcpu, &out);
+	return true;
+
+s2_trans_abort:
+	vcpu_sys_reg(vcpu, PAR_EL1) = setup_par_aborted(esr);
+	return true;
+}
+
+static bool handle_s12r(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+			const struct sys_reg_desc *r)
+{
+	return handle_s12(vcpu, p, r, false);
+}
+
+static bool handle_s12w(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+			const struct sys_reg_desc *r)
+{
+	return handle_s12(vcpu, p, r, true);
+}
+
 /*
  * AT instruction emulation
  *
@@ -1733,10 +1824,10 @@ static struct sys_reg_desc sys_insn_descs[] = {
 	SYS_INSN_TO_DESC(AT_S1E1WP, handle_s1e01, NULL),
 	SYS_INSN_TO_DESC(AT_S1E2R, handle_s1e2, NULL),
 	SYS_INSN_TO_DESC(AT_S1E2W, handle_s1e2, NULL),
-	SYS_INSN_TO_DESC(AT_S12E1R, NULL, NULL),
-	SYS_INSN_TO_DESC(AT_S12E1W, NULL, NULL),
-	SYS_INSN_TO_DESC(AT_S12E0R, NULL, NULL),
-	SYS_INSN_TO_DESC(AT_S12E0W, NULL, NULL),
+	SYS_INSN_TO_DESC(AT_S12E1R, handle_s12r, NULL),
+	SYS_INSN_TO_DESC(AT_S12E1W, handle_s12w, NULL),
+	SYS_INSN_TO_DESC(AT_S12E0R, handle_s12r, NULL),
+	SYS_INSN_TO_DESC(AT_S12E0W, handle_s12w, NULL),
 	SYS_INSN_TO_DESC(TLBI_IPAS2E1IS, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_IPAS2LE1IS, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_ALLE2IS, NULL, NULL),
