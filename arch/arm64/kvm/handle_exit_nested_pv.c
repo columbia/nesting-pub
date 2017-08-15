@@ -126,10 +126,51 @@ static int handle_msr_pv(struct kvm_vcpu *vcpu)
 
 static int handle_tlbi_pv(struct kvm_vcpu *vcpu)
 {
+	struct sys_reg_params p;
 	u16 imm = kvm_vcpu_hvc_get_imm(vcpu);
+	int tlbi_idx = get_tlbi_idx(imm);
+	u64 *gpregp = get_gp_regp(vcpu, imm);
 
-	kvm_err("Unknown PV encoding: imm: %#04x\n", imm);
-	return -ENXIO;
+	p.Op0 = 1;
+	p.Op1 = 4;
+	p.CRn = 8;
+	p.regval = *gpregp;
+
+	switch(tlbi_idx) {
+	case IPAS2E1IS:
+		p.CRm = 0;
+		p.Op2 = 1;
+		break;
+	case VMALLE1IS:
+		/* FIXME: This should trap via HCR_EL2.TTLB, not using pv */
+		p.Op1 = 0;
+		p.CRm = 3;
+		p.Op2 = 0;
+		break;
+	case VMALLS12E1IS:
+		p.CRm = 3;
+		p.Op2 = 6;
+		break;
+	case ALLE2:
+		p.CRm = 7;
+		p.Op2 = 0;
+		break;
+	case ALLE1IS:
+		p.CRm = 3;
+		p.Op2 = 4;
+		break;
+	case VMALLE1:
+		/* FIXME: This should trap via HCR_EL2.TTLB, not using pv */
+		p.Op1 = 0;
+		p.CRm = 7;
+		p.Op2 = 0;
+		break;
+	default:
+		pr_err("Not supported tlbi instruction via pv");
+		BUG();
+	}
+
+	return emulate_sys_instr(vcpu, &p);
 }
 
 /*

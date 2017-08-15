@@ -2137,7 +2137,11 @@ static void perform_access(struct kvm_vcpu *vcpu,
 		kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
 }
 
+#ifndef CONFIG_KVM_ARM_NESTED_PV
 static int emulate_sys_instr(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
+#else
+int emulate_sys_instr(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
+#endif
 {
 
 	const struct sys_reg_desc *r;

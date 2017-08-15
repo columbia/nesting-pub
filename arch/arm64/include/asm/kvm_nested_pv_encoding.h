@@ -49,12 +49,16 @@
  */
 
 #define TLBI_INSTR_SHIFT 5
+#define TLBI_IDX_MASK  (0xFF << TLBI_INSTR_SHIFT) /* 8 bits [5:12]*/
 
 #define	IPAS2E1IS	1
 #define	VMALLE1IS	2
 #define	VMALLS12E1IS	3
 #define	ALLE2		4
 #define	ALLE1IS		5
+#define VMALLE1		6
+
+#define get_tlbi_idx(x)		(((x) & TLBI_IDX_MASK) >> TLBI_INSTR_SHIFT)
 
 /* Macros for encoding */
 #define HVC_IMM_OFFSET		5	/* imm field is in hvc[20:5] */
