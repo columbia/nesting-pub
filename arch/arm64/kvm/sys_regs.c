@@ -966,6 +966,23 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
 	return true;
 }
 
+static bool forward_traps(struct kvm_vcpu *vcpu, u64 control_bit)
+{
+	bool control_bit_set;
+
+	control_bit_set = vcpu_sys_reg(vcpu, HCR_EL2) & control_bit;
+	if (!vcpu_mode_el2(vcpu) && control_bit_set) {
+		kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+		return true;
+	}
+	return false;
+}
+
+static bool forward_at_traps(struct kvm_vcpu *vcpu)
+{
+	return forward_traps(vcpu, HCR_AT);
+}
+
 /* This function is to support the recursive nested virtualization */
 bool forward_nv_traps(struct kvm_vcpu *vcpu)
 {
@@ -1948,32 +1965,32 @@ static bool handle_ipas2e1is(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
 #define SYS_INSN_TO_DESC(insn, access_fn, forward_fn)	\
 	{ SYS_DESC((insn)), (access_fn), NULL, 0, 0, NULL, NULL, (forward_fn) }
 static struct sys_reg_desc sys_insn_descs[] = {
-	SYS_INSN_TO_DESC(AT_S1E1R, handle_s1e01, NULL),
-	SYS_INSN_TO_DESC(AT_S1E1W, handle_s1e01, NULL),
-	SYS_INSN_TO_DESC(AT_S1E0R, handle_s1e01, NULL),
-	SYS_INSN_TO_DESC(AT_S1E0W, handle_s1e01, NULL),
-	SYS_INSN_TO_DESC(AT_S1E1RP, handle_s1e01, NULL),
-	SYS_INSN_TO_DESC(AT_S1E1WP, handle_s1e01, NULL),
-	SYS_INSN_TO_DESC(AT_S1E2R, handle_s1e2, NULL),
-	SYS_INSN_TO_DESC(AT_S1E2W, handle_s1e2, NULL),
-	SYS_INSN_TO_DESC(AT_S12E1R, handle_s12r, NULL),
-	SYS_INSN_TO_DESC(AT_S12E1W, handle_s12w, NULL),
-	SYS_INSN_TO_DESC(AT_S12E0R, handle_s12r, NULL),
-	SYS_INSN_TO_DESC(AT_S12E0W, handle_s12w, NULL),
-	SYS_INSN_TO_DESC(TLBI_IPAS2E1IS, handle_ipas2e1is, NULL),
-	SYS_INSN_TO_DESC(TLBI_IPAS2LE1IS, handle_ipas2e1is, NULL),
-	SYS_INSN_TO_DESC(TLBI_ALLE2IS, handle_alle2is, NULL),
-	SYS_INSN_TO_DESC(TLBI_VAE2IS, handle_vae2, NULL),
-	SYS_INSN_TO_DESC(TLBI_ALLE1IS, handle_alle1is, NULL),
-	SYS_INSN_TO_DESC(TLBI_VALE2IS, handle_vae2, NULL),
-	SYS_INSN_TO_DESC(TLBI_VMALLS12E1IS, handle_vmalls12e1is, NULL),
-	SYS_INSN_TO_DESC(TLBI_IPAS2E1, handle_ipas2e1is, NULL),
-	SYS_INSN_TO_DESC(TLBI_IPAS2LE1, handle_ipas2e1is, NULL),
-	SYS_INSN_TO_DESC(TLBI_ALLE2, handle_alle2, NULL),
-	SYS_INSN_TO_DESC(TLBI_VAE2, handle_vae2, NULL),
-	SYS_INSN_TO_DESC(TLBI_ALLE1, handle_alle1is, NULL),
-	SYS_INSN_TO_DESC(TLBI_VALE2, handle_vae2, NULL),
-	SYS_INSN_TO_DESC(TLBI_VMALLS12E1, handle_vmalls12e1is, NULL),
+	SYS_INSN_TO_DESC(AT_S1E1R, handle_s1e01, forward_at_traps),
+	SYS_INSN_TO_DESC(AT_S1E1W, handle_s1e01, forward_at_traps),
+	SYS_INSN_TO_DESC(AT_S1E0R, handle_s1e01, forward_at_traps),
+	SYS_INSN_TO_DESC(AT_S1E0W, handle_s1e01, forward_at_traps),
+	SYS_INSN_TO_DESC(AT_S1E1RP, handle_s1e01, forward_at_traps),
+	SYS_INSN_TO_DESC(AT_S1E1WP, handle_s1e01, forward_at_traps),
+	SYS_INSN_TO_DESC(AT_S1E2R, handle_s1e2, forward_nv_traps),
+	SYS_INSN_TO_DESC(AT_S1E2W, handle_s1e2, forward_nv_traps),
+	SYS_INSN_TO_DESC(AT_S12E1R, handle_s12r, forward_nv_traps),
+	SYS_INSN_TO_DESC(AT_S12E1W, handle_s12w, forward_nv_traps),
+	SYS_INSN_TO_DESC(AT_S12E0R, handle_s12r, forward_nv_traps),
+	SYS_INSN_TO_DESC(AT_S12E0W, handle_s12w, forward_nv_traps),
+	SYS_INSN_TO_DESC(TLBI_IPAS2E1IS, handle_ipas2e1is, forward_nv_traps),
+	SYS_INSN_TO_DESC(TLBI_IPAS2LE1IS, handle_ipas2e1is, forward_nv_traps),
+	SYS_INSN_TO_DESC(TLBI_ALLE2IS, handle_alle2is, forward_nv_traps),
+	SYS_INSN_TO_DESC(TLBI_VAE2IS, handle_vae2, forward_nv_traps),
+	SYS_INSN_TO_DESC(TLBI_ALLE1IS, handle_alle1is, forward_nv_traps),
+	SYS_INSN_TO_DESC(TLBI_VALE2IS, handle_vae2, forward_nv_traps),
+	SYS_INSN_TO_DESC(TLBI_VMALLS12E1IS, handle_vmalls12e1is, forward_nv_traps),
+	SYS_INSN_TO_DESC(TLBI_IPAS2E1, handle_ipas2e1is, forward_nv_traps),
+	SYS_INSN_TO_DESC(TLBI_IPAS2LE1, handle_ipas2e1is, forward_nv_traps),
+	SYS_INSN_TO_DESC(TLBI_ALLE2, handle_alle2, forward_nv_traps),
+	SYS_INSN_TO_DESC(TLBI_VAE2, handle_vae2, forward_nv_traps),
+	SYS_INSN_TO_DESC(TLBI_ALLE1, handle_alle1is, forward_nv_traps),
+	SYS_INSN_TO_DESC(TLBI_VALE2, handle_vae2, forward_nv_traps),
+	SYS_INSN_TO_DESC(TLBI_VMALLS12E1, handle_vmalls12e1is, forward_nv_traps),
 };
 
 #define reg_to_match_value(x)						\
