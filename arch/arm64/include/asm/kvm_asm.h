@@ -56,6 +56,9 @@ extern void __kvm_tlb_flush_vmid_ipa(u64 vttbr, phys_addr_t ipa);
 extern void __kvm_tlb_flush_vmid(u64 vttbr);
 extern void __kvm_tlb_flush_local_vmid(u64 vttbr);
 
+extern void __kvm_at_insn(struct kvm_vcpu *vcpu, unsigned long vaddr,
+			  bool el2_regime, int sys_encoding);
+
 extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
 
 extern u64 __vgic_v3_get_ich_vtr_el2(void);
