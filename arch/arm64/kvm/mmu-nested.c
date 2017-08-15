@@ -349,6 +349,29 @@ static struct kvm_nested_s2_mmu *lookup_nested_mmu(struct kvm_vcpu *vcpu,
 	return NULL;
 }
 
+/*
+ * Clear mappings in the shadow stage 2 page tables for the current VMID from
+ * the perspective of the guest hypervisor.
+ * This function expects kvm->mmu_lock to be held.
+ */
+bool kvm_nested_s2_clear_curr_vmid(struct kvm_vcpu *vcpu, phys_addr_t start,
+				   u64 size)
+{
+	struct kvm_nested_s2_mmu *nested_mmu;
+	u64 vttbr = vcpu_sys_reg(vcpu, VTTBR_EL2);
+
+	/*
+	 * Look up a mmu that is used for the current VMID from the guest
+	 * hypervisor's view.
+	 */
+	nested_mmu = lookup_nested_mmu(vcpu, vttbr);
+	if (!nested_mmu)
+		return false;
+
+	kvm_unmap_stage2_range(vcpu->kvm, &nested_mmu->mmu, start, size);
+	return true;
+}
+
 /**
  * create_nested_mmu - create mmu for the given virtual VMID
  *
