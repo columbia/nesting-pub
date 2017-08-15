@@ -367,6 +367,44 @@
 
 #define SYS_SP_EL2			sys_reg(3, 6, 4, 1, 0)
 
+/* AT instructions */
+#define AT_Op0 1
+#define AT_CRn 7
+
+#define AT_S1E1R	sys_insn(AT_Op0, 0, AT_CRn, 8, 0)
+#define AT_S1E1W	sys_insn(AT_Op0, 0, AT_CRn, 8, 1)
+#define AT_S1E0R	sys_insn(AT_Op0, 0, AT_CRn, 8, 2)
+#define AT_S1E0W	sys_insn(AT_Op0, 0, AT_CRn, 8, 3)
+#define AT_S1E1RP	sys_insn(AT_Op0, 0, AT_CRn, 9, 0)
+#define AT_S1E1WP	sys_insn(AT_Op0, 0, AT_CRn, 9, 1)
+#define AT_S1E2R	sys_insn(AT_Op0, 4, AT_CRn, 8, 0)
+#define AT_S1E2W	sys_insn(AT_Op0, 4, AT_CRn, 8, 1)
+#define AT_S12E1R	sys_insn(AT_Op0, 4, AT_CRn, 8, 4)
+#define AT_S12E1W	sys_insn(AT_Op0, 4, AT_CRn, 8, 5)
+#define AT_S12E0R	sys_insn(AT_Op0, 4, AT_CRn, 8, 6)
+#define AT_S12E0W	sys_insn(AT_Op0, 4, AT_CRn, 8, 7)
+
+/* TLBI instructions */
+#define TLBI_Op0	1
+#define TLBI_Op1_EL2	4	/* Accessible from EL2 or higher */
+#define TLBI_CRn	8
+#define tlbi_insn_el2(CRm, Op2)	sys_insn(TLBI_Op0, TLBI_Op1_EL2, TLBI_CRn, (CRm), (Op2))
+
+#define TLBI_IPAS2E1IS	tlbi_insn_el2(0, 1)
+#define TLBI_IPAS2LE1IS	tlbi_insn_el2(0, 5)
+#define TLBI_ALLE2IS	tlbi_insn_el2(3, 0)
+#define TLBI_VAE2IS	tlbi_insn_el2(3, 1)
+#define TLBI_ALLE1IS	tlbi_insn_el2(3, 4)
+#define TLBI_VALE2IS	tlbi_insn_el2(3, 5)
+#define TLBI_VMALLS12E1IS	tlbi_insn_el2(3, 6)
+#define TLBI_IPAS2E1	tlbi_insn_el2(4, 1)
+#define TLBI_IPAS2LE1	tlbi_insn_el2(4, 5)
+#define TLBI_ALLE2	tlbi_insn_el2(7, 0)
+#define TLBI_VAE2	tlbi_insn_el2(7, 1)
+#define TLBI_ALLE1	tlbi_insn_el2(7, 4)
+#define TLBI_VALE2	tlbi_insn_el2(7, 5)
+#define TLBI_VMALLS12E1	tlbi_insn_el2(7, 6)
+
 /* Common SCTLR_ELx flags. */
 #define SCTLR_ELx_EE    (1 << 25)
 #define SCTLR_ELx_I	(1 << 12)
