@@ -1795,6 +1795,31 @@ static bool handle_vae2(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
 	return true;
 }
 
+static bool handle_alle1is(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+			   const struct sys_reg_desc *r)
+{
+	struct kvm_s2_mmu *mmu = &vcpu->kvm->arch.mmu;
+	u64 vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
+
+	if (vcpu->kvm->arch.mmu.vmid.vmid_gen) {
+		/*
+		 * Invalidate the stage 1 and 2 TLB entries for the host OS
+		 * in a VM only if there is one.
+		 */
+		kvm_call_hyp(__kvm_tlb_flush_vmid, vttbr);
+	}
+
+	spin_lock(&vcpu->kvm->mmu_lock);
+	/*
+	 * Clear all mappings in the shadow page tables and invalidate the stage
+	 * 1 and 2 TLB entries via kvm_tlb_flush_vmid_ipa().
+	 */
+	kvm_nested_s2_clear(vcpu->kvm);
+	spin_unlock(&vcpu->kvm->mmu_lock);
+
+	return true;
+}
+
 /*
  * AT instruction emulation
  *
@@ -1880,14 +1905,14 @@ static struct sys_reg_desc sys_insn_descs[] = {
 	SYS_INSN_TO_DESC(TLBI_IPAS2LE1IS, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_ALLE2IS, handle_alle2is, NULL),
 	SYS_INSN_TO_DESC(TLBI_VAE2IS, handle_vae2, NULL),
-	SYS_INSN_TO_DESC(TLBI_ALLE1IS, NULL, NULL),
+	SYS_INSN_TO_DESC(TLBI_ALLE1IS, handle_alle1is, NULL),
 	SYS_INSN_TO_DESC(TLBI_VALE2IS, handle_vae2, NULL),
 	SYS_INSN_TO_DESC(TLBI_VMALLS12E1IS, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_IPAS2E1, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_IPAS2LE1, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_ALLE2, handle_alle2, NULL),
 	SYS_INSN_TO_DESC(TLBI_VAE2, handle_vae2, NULL),
-	SYS_INSN_TO_DESC(TLBI_ALLE1, NULL, NULL),
+	SYS_INSN_TO_DESC(TLBI_ALLE1, handle_alle1is, NULL),
 	SYS_INSN_TO_DESC(TLBI_VALE2, handle_vae2, NULL),
 	SYS_INSN_TO_DESC(TLBI_VMALLS12E1, NULL, NULL),
 };
