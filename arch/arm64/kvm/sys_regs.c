@@ -1747,6 +1747,37 @@ static bool handle_s12w(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
 	return handle_s12(vcpu, p, r, true);
 }
 
+static bool handle_alle2(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+			 const struct sys_reg_desc *r)
+{
+	struct kvm_s2_mmu *mmu = &vcpu->kvm->arch.mmu;
+	u64 vttbr = kvm_get_vttbr(&mmu->el2_vmid, mmu);
+
+	/*
+	 * To emulate invalidating all EL2 regime stage 1 TLB entries,
+	 * invalidate EL1&0 regime stage 1 TLB entries with the virtual EL2's
+	 * VMID.
+	 */
+	kvm_call_hyp(__kvm_tlb_flush_local_vmid, vttbr);
+	return true;
+}
+
+static bool handle_alle2is(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+			   const struct sys_reg_desc *r)
+{
+	struct kvm_s2_mmu *mmu = &vcpu->kvm->arch.mmu;
+	u64 vttbr = kvm_get_vttbr(&mmu->el2_vmid, mmu);
+
+	/*
+	 * To emulate invalidating all EL2 regime stage 1 TLB entries for all
+	 * PEs, executing TLBI VMALLE1IS is enough. But reuse the existing
+	 * interface for the simplicity; invalidating stage 2 entries doesn't
+	 * affect the correctness.
+	 */
+	kvm_call_hyp(__kvm_tlb_flush_vmid, vttbr);
+	return true;
+}
+
 /*
  * AT instruction emulation
  *
@@ -1830,14 +1861,14 @@ static struct sys_reg_desc sys_insn_descs[] = {
 	SYS_INSN_TO_DESC(AT_S12E0W, handle_s12w, NULL),
 	SYS_INSN_TO_DESC(TLBI_IPAS2E1IS, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_IPAS2LE1IS, NULL, NULL),
-	SYS_INSN_TO_DESC(TLBI_ALLE2IS, NULL, NULL),
+	SYS_INSN_TO_DESC(TLBI_ALLE2IS, handle_alle2is, NULL),
 	SYS_INSN_TO_DESC(TLBI_VAE2IS, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_ALLE1IS, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_VALE2IS, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_VMALLS12E1IS, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_IPAS2E1, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_IPAS2LE1, NULL, NULL),
-	SYS_INSN_TO_DESC(TLBI_ALLE2, NULL, NULL),
+	SYS_INSN_TO_DESC(TLBI_ALLE2, handle_alle2, NULL),
 	SYS_INSN_TO_DESC(TLBI_VAE2, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_ALLE1, NULL, NULL),
 	SYS_INSN_TO_DESC(TLBI_VALE2, NULL, NULL),
