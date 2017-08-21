@@ -325,6 +325,11 @@ static inline unsigned int kvm_get_vmid_bits(void)
 struct kvm_nested_s2_mmu *get_nested_mmu(struct kvm_vcpu *vcpu, u64 vttbr);
 struct kvm_s2_mmu *vcpu_get_active_s2_mmu(struct kvm_vcpu *vcpu);
 void update_nested_s2_mmu(struct kvm_vcpu *vcpu);
+void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu);
+void kvm_nested_s2_free(struct kvm *kvm);
+void kvm_nested_s2_wp(struct kvm *kvm);
+void kvm_nested_s2_clear(struct kvm *kvm);
+void kvm_nested_s2_flush(struct kvm *kvm);
 
 static inline u64 kvm_get_vttbr(struct kvm_s2_vmid *vmid,
 				struct kvm_s2_mmu *mmu)
