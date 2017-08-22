@@ -271,6 +271,28 @@ int kvm_walk_nested_s2(struct kvm_vcpu *vcpu, phys_addr_t gipa,
 	return walk_nested_s2_pgd(vcpu, gipa, &wi, result);
 }
 
+/*
+ * Returns non-zero if permission fault is handled by injecting it to the next
+ * level hypervisor.
+ */
+int kvm_s2_handle_perm_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+			     struct kvm_s2_trans *trans)
+{
+	unsigned long fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+	bool write_fault = kvm_is_write_fault(vcpu);
+
+	if (fault_status != FSC_PERM)
+		return 0;
+
+	if ((write_fault && !trans->writable) ||
+	    (!write_fault && !trans->readable)) {
+		trans->esr = esr_s2_fault(vcpu, trans->level, ESR_ELx_FSC_PERM);
+		return 1;
+	}
+
+	return 0;
+}
+
 /* expects kvm->mmu_lock to be held */
 void kvm_nested_s2_wp(struct kvm *kvm)
 {

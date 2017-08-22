@@ -337,6 +337,8 @@ struct kvm_s2_mmu *vcpu_get_active_s2_mmu(struct kvm_vcpu *vcpu);
 void update_nested_s2_mmu(struct kvm_vcpu *vcpu);
 int kvm_walk_nested_s2(struct kvm_vcpu *vcpu, phys_addr_t gipa,
 		       struct kvm_s2_trans *result);
+int kvm_s2_handle_perm_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+			     struct kvm_s2_trans *trans);
 void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu);
 void kvm_nested_s2_free(struct kvm *kvm);
 void kvm_nested_s2_wp(struct kvm *kvm);
