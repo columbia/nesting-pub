@@ -983,6 +983,11 @@ static bool forward_at_traps(struct kvm_vcpu *vcpu)
 	return forward_traps(vcpu, HCR_AT);
 }
 
+static bool forward_ttlb_traps(struct kvm_vcpu *vcpu)
+{
+	return forward_traps(vcpu, HCR_TTLB);
+}
+
 /* This function is to support the recursive nested virtualization */
 bool forward_nv_traps(struct kvm_vcpu *vcpu)
 {
@@ -1896,6 +1901,37 @@ static bool handle_ipas2e1is(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
 	return true;
 }
 
+static bool handle_tlbi_el1(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+			    const struct sys_reg_desc *r)
+{
+	u64 virtual_vttbr = vcpu_sys_reg(vcpu, VTTBR_EL2);
+	u64 vttbr;
+	struct kvm_nested_s2_mmu *nested_mmu;
+	struct kvm_s2_mmu *mmu = &vcpu->kvm->arch.mmu;
+	int sys_encoding = sys_insn(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
+
+	nested_mmu = lookup_nested_mmu(vcpu, virtual_vttbr);
+	if (!nested_mmu) {
+		/*
+		 * If we can't find a shadow VMID, it is either the virtual
+		 * VMID is for the host OS or the nested VM having the virtual
+		 * VMID is never executed. (Note that we create a showdow VMID
+		 * when entering a VM.) For the former, we can flush TLB
+		 * entries belonging to the host OS in a VM. For the latter, we
+		 * don't have to do anything. Since we can't differentiate
+		 * between those cases, just do what we can do for the former.
+		 */
+		mmu = &vcpu->kvm->arch.mmu;
+	} else {
+		mmu = &nested_mmu->mmu;
+	}
+
+	vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
+	kvm_call_hyp(__kvm_tlb_el1_instr, vttbr, p->regval, sys_encoding);
+
+	return true;
+}
+
 /*
  * AT instruction emulation
  *
@@ -1971,6 +2007,20 @@ static struct sys_reg_desc sys_insn_descs[] = {
 	SYS_INSN_TO_DESC(AT_S1E0W, handle_s1e01, forward_at_traps),
 	SYS_INSN_TO_DESC(AT_S1E1RP, handle_s1e01, forward_at_traps),
 	SYS_INSN_TO_DESC(AT_S1E1WP, handle_s1e01, forward_at_traps),
+
+	SYS_INSN_TO_DESC(TLBI_VMALLE1IS, handle_tlbi_el1, forward_ttlb_traps),
+	SYS_INSN_TO_DESC(TLBI_VAE1IS, handle_tlbi_el1, forward_ttlb_traps),
+	SYS_INSN_TO_DESC(TLBI_ASIDE1IS, handle_tlbi_el1, forward_ttlb_traps),
+	SYS_INSN_TO_DESC(TLBI_VAAE1IS, handle_tlbi_el1, forward_ttlb_traps),
+	SYS_INSN_TO_DESC(TLBI_VALE1IS, handle_tlbi_el1, forward_ttlb_traps),
+	SYS_INSN_TO_DESC(TLBI_VAALE1IS, handle_tlbi_el1, forward_ttlb_traps),
+	SYS_INSN_TO_DESC(TLBI_VMALLE1, handle_tlbi_el1, forward_ttlb_traps),
+	SYS_INSN_TO_DESC(TLBI_VAE1, handle_tlbi_el1, forward_ttlb_traps),
+	SYS_INSN_TO_DESC(TLBI_ASIDE1, handle_tlbi_el1, forward_ttlb_traps),
+	SYS_INSN_TO_DESC(TLBI_VAAE1, handle_tlbi_el1, forward_ttlb_traps),
+	SYS_INSN_TO_DESC(TLBI_VALE1, handle_tlbi_el1, forward_ttlb_traps),
+	SYS_INSN_TO_DESC(TLBI_VAALE1, handle_tlbi_el1, forward_ttlb_traps),
+
 	SYS_INSN_TO_DESC(AT_S1E2R, handle_s1e2, forward_nv_traps),
 	SYS_INSN_TO_DESC(AT_S1E2W, handle_s1e2, forward_nv_traps),
 	SYS_INSN_TO_DESC(AT_S12E1R, handle_s12r, forward_nv_traps),

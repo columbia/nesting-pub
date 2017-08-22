@@ -386,9 +386,24 @@
 
 /* TLBI instructions */
 #define TLBI_Op0	1
+#define TLBI_Op1_EL1	0	/* Accessible from EL1 or higher */
 #define TLBI_Op1_EL2	4	/* Accessible from EL2 or higher */
 #define TLBI_CRn	8
+#define tlbi_insn_el1(CRm, Op2)	sys_insn(TLBI_Op0, TLBI_Op1_EL1, TLBI_CRn, (CRm), (Op2))
 #define tlbi_insn_el2(CRm, Op2)	sys_insn(TLBI_Op0, TLBI_Op1_EL2, TLBI_CRn, (CRm), (Op2))
+
+#define TLBI_VMALLE1IS	tlbi_insn_el1(3, 0)
+#define TLBI_VAE1IS	tlbi_insn_el1(3, 1)
+#define TLBI_ASIDE1IS	tlbi_insn_el1(3, 2)
+#define TLBI_VAAE1IS	tlbi_insn_el1(3, 3)
+#define TLBI_VALE1IS	tlbi_insn_el1(3, 5)
+#define TLBI_VAALE1IS	tlbi_insn_el1(3, 7)
+#define TLBI_VMALLE1	tlbi_insn_el1(7, 0)
+#define TLBI_VAE1	tlbi_insn_el1(7, 1)
+#define TLBI_ASIDE1	tlbi_insn_el1(7, 2)
+#define TLBI_VAAE1	tlbi_insn_el1(7, 3)
+#define TLBI_VALE1	tlbi_insn_el1(7, 5)
+#define TLBI_VAALE1	tlbi_insn_el1(7, 7)
 
 #define TLBI_IPAS2E1IS	tlbi_insn_el2(0, 1)
 #define TLBI_IPAS2LE1IS	tlbi_insn_el2(0, 5)

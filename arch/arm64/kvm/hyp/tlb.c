@@ -179,3 +179,55 @@ void __hyp_text __kvm_tlb_vae2(u64 vttbr, u64 va, u64 sys_encoding)
 
 	__tlb_switch_to_host()();
 }
+
+void __hyp_text __kvm_tlb_el1_instr(u64 vttbr, u64 val, u64 sys_encoding)
+{
+	/* Switch to requested VMID */
+	__tlb_switch_to_guest()(vttbr);
+
+	/* Execute the same instruction as the guest hypervisor did */
+	switch (sys_encoding) {
+	case TLBI_VMALLE1IS:
+		__tlbi(vmalle1is);
+		break;
+	case TLBI_VAE1IS:
+		__tlbi(vae1is, val);
+		break;
+	case TLBI_ASIDE1IS:
+		__tlbi(aside1is, val);
+		break;
+	case TLBI_VAAE1IS:
+		__tlbi(vaae1is, val);
+		break;
+	case TLBI_VALE1IS:
+		__tlbi(vale1is, val);
+		break;
+	case TLBI_VAALE1IS:
+		__tlbi(vaale1is, val);
+		break;
+	case TLBI_VMALLE1:
+		__tlbi(vmalle1);
+		break;
+	case TLBI_VAE1:
+		__tlbi(vae1, val);
+		break;
+	case TLBI_ASIDE1:
+		__tlbi(aside1, val);
+		break;
+	case TLBI_VAAE1:
+		__tlbi(vaae1, val);
+		break;
+	case TLBI_VALE1:
+		__tlbi(vale1, val);
+		break;
+	case TLBI_VAALE1:
+		__tlbi(vaale1, val);
+		break;
+	default:
+		break;
+	}
+	dsb(nsh);
+	isb();
+
+	__tlb_switch_to_host()();
+}

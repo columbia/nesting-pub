@@ -332,8 +332,7 @@ void kvm_nested_s2_free(struct kvm *kvm)
 		__kvm_free_stage2_pgd(kvm, &nested_mmu->mmu);
 }
 
-static struct kvm_nested_s2_mmu *lookup_nested_mmu(struct kvm_vcpu *vcpu,
-						   u64 vttbr)
+struct kvm_nested_s2_mmu *lookup_nested_mmu(struct kvm_vcpu *vcpu, u64 vttbr)
 {
 	struct kvm_nested_s2_mmu *mmu;
 	u64 virtual_vmid;
