@@ -65,6 +65,28 @@ struct kvm_s2_mmu {
 	pgd_t *pgd;
 };
 
+/* Per shadow VMID mmu structure */
+struct kvm_nested_s2_mmu {
+	struct kvm_s2_mmu mmu;
+
+	/*
+	 * virtual_vttbr contains vttbr_el2 value from the guest hypervisor.
+	 * We use vmid field as a key to search for this mmu object in the list,
+	 * and ignore baddr field.
+	 *
+	 * Note that we may use both of vmid field and baddr field respectively
+	 * to find a shadow VMID and a pointer to the shadow stage-2 page
+	 * table, then combine them to set up hw_vttbr. The only benefit of
+	 * doing that would be reusing shadow stage-2 page tables for different
+	 * VMIDs, which is not usual. So, we choose the current design for the
+	 * simplicity.
+	 *
+	 */
+	u64 virtual_vttbr;
+
+	struct list_head list;
+};
+
 struct kvm_arch {
 	/* Stage 2 paging state for the VM */
 	struct kvm_s2_mmu mmu;
@@ -77,6 +99,9 @@ struct kvm_arch {
 
 	/* Interrupt controller */
 	struct vgic_dist	vgic;
+
+	/* Stage 2 shadow paging contexts for nested L2 VM */
+	struct list_head nested_mmu_list;
 };
 
 #define KVM_NR_MEM_OBJS     40
