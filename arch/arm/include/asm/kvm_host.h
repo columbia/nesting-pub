@@ -67,6 +67,15 @@ struct kvm_s2_mmu {
 	pgd_t *pgd;
 };
 
+/* Per shadow VMID mmu structure. This is only for nested virtualization */
+struct kvm_nested_s2_mmu {
+	struct kvm_s2_mmu mmu;
+
+	u64 virtual_vttbr;
+
+	struct list_head list;
+};
+
 struct kvm_arch {
 	/* Stage 2 paging state for the VM */
 	struct kvm_s2_mmu mmu;
@@ -78,6 +87,9 @@ struct kvm_arch {
 	 * Anything that is not used directly from assembly code goes
 	 * here.
 	 */
+
+	/* Never used on arm but added to be compatible with arm64 */
+	struct list_head nested_mmu_list;
 
 	/* Interrupt controller */
 	struct vgic_dist	vgic;
