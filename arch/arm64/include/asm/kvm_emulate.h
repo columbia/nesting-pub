@@ -385,4 +385,12 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
 	return data;		/* Leave LE untouched */
 }
 
+static inline struct kvm_s2_vmid *vcpu_get_active_vmid(struct kvm_vcpu *vcpu)
+{
+	if (unlikely(is_hyp_ctxt(vcpu)))
+		return &vcpu->kvm->arch.mmu.el2_vmid;
+
+	return &vcpu->kvm->arch.mmu.vmid;
+}
+
 #endif /* __ARM64_KVM_EMULATE_H__ */
