@@ -1400,6 +1400,60 @@ int gic_of_init_child(struct device *dev, struct gic_chip_data **gic, int irq)
 	return 0;
 }
 
+static u64 adjust_gicv_addr(u64 vcpu_base)
+{
+	void __iomem *alt;
+
+	if (!gicv2_force_probe) {
+		pr_warn("*************************************************\n");
+		pr_warn("GICV: GICv2 detected, and irqchip.gicv2_force_probe not set\n");
+		pr_warn("This may prevent your guest hypervisor from booting if it uses split EOI/deactivate mode.\n");
+		pr_warn("*************************************************\n");
+		return vcpu_base;
+	}
+
+	alt = ioremap(vcpu_base, SZ_8K);
+	if (!alt)
+		return vcpu_base;
+
+	if (!gic_check_gicv2(alt)) {
+		pr_warn("GICV: The first 4K page is not even GICv2.\n");
+		return vcpu_base;
+	}
+
+	/*
+	 * We don't check the GICV size at all since having 8K doesn't mean
+	 * it has the correct mapping. For example, m400 has 8K size for GICV,
+	 * but two 4K pages are just aliased.
+	 */
+	if (gic_check_gicv2(alt + SZ_4K)) {
+		/*
+		 * We detected *two* initial GICv2 pages in a row. Could be a
+		 * GICv2 aliased over two 64kB pages. Update the resource, map
+		 * the iospace, and pray.
+		 */
+		iounmap(alt);
+		alt = ioremap(vcpu_base, SZ_128K);
+		if (!alt)
+			return vcpu_base;
+		pr_warn("GICV: Aliased GICv2 GICV at %pa, trying to find the canonical range over 128kB\n",
+			&vcpu_base);
+	} else {
+		pr_warn("GICV: GICv2 at %pa, and the second 4K page is different from the first one. Probably this DT is the correct one.\n",
+			&vcpu_base);
+		return vcpu_base;
+	}
+
+	/* At this point, size of alt is 128K */
+	if (!gic_check_gicv2(alt) || !gic_check_gicv2(alt + 0xf000))
+		return vcpu_base;
+
+	vcpu_base += 0xf000;
+	pr_warn("GICV: Adjusting GICV interface base to %pa\n", &vcpu_base);
+
+	return vcpu_base;
+}
+
 static void __init gic_of_setup_kvm_info(struct device_node *node)
 {
 	int ret;
@@ -1419,6 +1473,9 @@ static void __init gic_of_setup_kvm_info(struct device_node *node)
 	ret = of_address_to_resource(node, 3, vcpu_res);
 	if (ret)
 		return;
+
+	pr_err("kvm: GICV vcpu_res->start was: %llx\n", vcpu_res->start);
+	vcpu_res->start = adjust_gicv_addr(vcpu_res->start);
 
 	if (static_key_true(&supports_deactivate))
 		gic_set_kvm_info(&gic_v2_kvm_info);
