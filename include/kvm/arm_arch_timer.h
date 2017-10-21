@@ -47,6 +47,7 @@ struct arch_timer_context {
 
 struct arch_timer_cpu {
 	struct arch_timer_context	vtimer;
+	struct arch_timer_context	vtimer_el2;
 	struct arch_timer_context	ptimer;
 
 	/* Background timer used when the guest is not running */
@@ -91,6 +92,7 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
 void kvm_timer_init_vhe(void);
 
 #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.vtimer)
+#define vcpu_vtimer_el2(v)	(&(v)->arch.timer_cpu.vtimer_el2)
 #define vcpu_ptimer(v)	(&(v)->arch.timer_cpu.ptimer)
 
 #endif

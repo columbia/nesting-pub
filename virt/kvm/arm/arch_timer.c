@@ -634,6 +634,7 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
 int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+	struct arch_timer_context *vtimer_el2 = vcpu_vtimer_el2(vcpu);
 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
 
 	/*
@@ -643,6 +644,7 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
 	 * the ARMv7 architecture.
 	 */
 	vtimer->cnt_ctl = 0;
+	vtimer_el2->cnt_ctl = 0;
 	ptimer->cnt_ctl = 0;
 	kvm_timer_update_state(vcpu);
 
@@ -657,14 +659,17 @@ static void update_vtimer_cntvoff(struct kvm_vcpu *vcpu, u64 cntvoff)
 	struct kvm_vcpu *tmp;
 
 	mutex_lock(&kvm->lock);
-	kvm_for_each_vcpu(i, tmp, kvm)
+	kvm_for_each_vcpu(i, tmp, kvm) {
 		vcpu_vtimer(tmp)->cntvoff = cntvoff;
+		vcpu_vtimer_el2(tmp)->cntvoff = cntvoff;
+	}
 
 	/*
 	 * When called from the vcpu create path, the CPU being created is not
 	 * included in the loop above, so we just set it here as well.
 	 */
 	vcpu_vtimer(vcpu)->cntvoff = cntvoff;
+	vcpu_vtimer_el2(vcpu)->cntvoff = cntvoff;
 	mutex_unlock(&kvm->lock);
 }
 
