@@ -214,3 +214,21 @@ int handle_pv(struct kvm_vcpu *vcpu)
 	return pv_handler(vcpu);
 }
 
+bool psci_pv(struct kvm_vcpu *vcpu)
+{
+	u16 imm = kvm_vcpu_hvc_get_imm(vcpu);
+
+	if (imm != SMC_PSCI)
+		return false;
+
+	/* This is from the VHE guest */
+	if (vcpu_mode_el2(vcpu) && vcpu_el2_e2h_is_set(vcpu))
+		return true;
+
+	/* This is from the non-VHE guest (i.e. L1 host OS) */
+	if (!vcpu_mode_el2(vcpu) && !vcpu_nested_stage2_enabled(vcpu))
+		return true;
+
+	return false;
+}
+

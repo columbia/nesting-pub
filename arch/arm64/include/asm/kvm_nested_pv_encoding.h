@@ -19,12 +19,21 @@
  */
 
 #define PV_INSTR_SHIFT	13
+#define SMC_PV		0x0
 #define MRS_PV		0x1
 #define MSR_REG_PV	0x2
 #define MSR_IMM_PV	0x3
 #define ERET_PV		0x4
 #define TLBI_PV		0x5
 #define HVC_PV		0x6
+
+/*
+ * SMC
+ *
+ * We only have one smc call - psci.
+ * Use hvc #1 for this.
+ */
+#define SMC_PSCI	0x1
 
 /*
  * MRS and MSR
