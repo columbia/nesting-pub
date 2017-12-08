@@ -14,7 +14,8 @@
  * 100 ERET
  * 101 TLBI
  * 110 HVC
- * 111 Reserved
+ * 1110 debug
+ * 1111 Reserved
  *
  */
 

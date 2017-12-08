@@ -53,12 +53,26 @@ bool nested_virt_in_use(struct kvm_vcpu *vcpu)
 }
 
 #ifdef CONFIG_KVM_ARM_NESTED_PV
+static bool kvm_nested_debug(int imm)
+{
+	/* the first 4bits of hvc param out of 16 */
+	u8 imm_instr = imm >> 12;
+
+	if (imm_instr == 0xe)
+		return true;
+	return false;
+}
+
 /* We forward all hvc instruction to the guest hypervisor. */
 int handle_hvc_nested(struct kvm_vcpu *vcpu)
 {
 
 	if (psci_pv(vcpu))
 		return -EINVAL;
+
+	/* Handle a version check*/
+	if (kvm_nested_debug(kvm_vcpu_hvc_get_imm(vcpu)))
+		return handle_debug(vcpu);
 
 	/* Handle pv hvc call from virtual EL2 */
 	if (vcpu_mode_el2(vcpu))

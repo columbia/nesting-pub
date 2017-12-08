@@ -232,3 +232,32 @@ bool psci_pv(struct kvm_vcpu *vcpu)
 	return false;
 }
 
+int handle_debug(struct kvm_vcpu *vcpu)
+{
+	u16 imm = kvm_vcpu_hvc_get_imm(vcpu);
+
+#if 0
+	/* This is a sample code for the guest */
+	asm volatile(
+		     "mov x0, #123\n\t"
+		     "mov x1, %[i]\n\t"
+		     "hvc #0xe02e\n\t"
+		     : /* Output */
+		     : /* Input */ [i] "r" (i)
+		     : /* Clobbers */ "x0", "x1"
+		    );
+#endif
+
+	trace_printk("[%d] debug imm: 0x%x, x0: 0x%08lx, x1: 0x%08lx\n",
+						vcpu->vcpu_id,
+						imm,
+						vcpu_get_reg(vcpu, 0),
+						vcpu_get_reg(vcpu, 1)
+						);
+
+	if (imm == 0xeeee)
+		BUG();
+
+	return 1;
+}
+
