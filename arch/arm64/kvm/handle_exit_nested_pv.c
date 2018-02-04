@@ -21,6 +21,7 @@
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_mmu.h>
 #include <asm/kvm_nested_pv.h>
+#include <asm/kvm_hyp.h>
 
 #include "sys_regs.h"
 
@@ -30,6 +31,8 @@ typedef int (*pv_handle_fn)(struct kvm_vcpu *);
 
 static u64 *get_special_reg(struct kvm_vcpu *vcpu, u32 sreg_num)
 {
+	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+
 	switch (sreg_num) {
 	case SP_EL1:
 		return &vcpu->arch.ctxt.gp_regs.sp_el1;
@@ -41,6 +44,10 @@ static u64 *get_special_reg(struct kvm_vcpu *vcpu, u32 sreg_num)
 		return &vcpu_el2_sreg(vcpu, SPSR_EL2);
 	case ELR_EL2_PV:
 		return &vcpu_el2_sreg(vcpu, ELR_EL2);
+	case CNTV_CTL_EL02:
+		return (u64 *)&vtimer->cnt_ctl;
+	case CNTV_CVAL_EL02:
+		return &vtimer->cnt_cval;
 	default:
 		return ERR_PTR(-EINVAL);
 	};
@@ -79,11 +86,31 @@ static u64* get_gp_regp(struct kvm_vcpu *vcpu, u16 imm)
 	return gpregp;
 }
 
+static u64 is_vtimer_regs(u16 imm)
+{
+	u32 sreg_num = get_sysreg_num(imm);
+
+	if (is_el2_reg(imm))
+		return 0;
+
+	switch (sreg_num) {
+	case CNTV_CTL_EL02:
+		return KVM_REG_ARM_TIMER_CTL;
+	case CNTV_CVAL_EL02:
+		return KVM_REG_ARM_TIMER_CVAL;
+	default:
+		;
+	}
+
+	return 0;
+}
+
 static int handle_mrs_pv(struct kvm_vcpu *vcpu)
 {
 	u16 imm = kvm_vcpu_hvc_get_imm(vcpu);
 	u64 *gpregp = get_gp_regp(vcpu, imm);
 	u64 *sysregp = get_sys_regp(vcpu, imm);
+	u64 vtimer_reg;
 
 	if (IS_ERR(sysregp))
 		return PTR_ERR(sysregp);
@@ -92,8 +119,14 @@ static int handle_mrs_pv(struct kvm_vcpu *vcpu)
 				*sysregp, get_gpreg_num(imm),
 				is_el2_reg(imm));
 
-	/* MRS doesn't take xzr(x31) as an operand, so gpregp is not NULL */
-	*gpregp = *sysregp;
+	vtimer_reg = is_vtimer_regs(imm);
+	if (vtimer_reg)
+		*gpregp= kvm_arm_timer_get_reg(vcpu, vtimer_reg);
+	else {
+		/* MRS doesn't take xzr(x31) as an operand, so gpregp is not NULL */
+		*gpregp = *sysregp;
+	}
+
 	return 1;
 }
 
@@ -102,6 +135,7 @@ static int handle_msr_pv(struct kvm_vcpu *vcpu)
 	u16 imm = kvm_vcpu_hvc_get_imm(vcpu);
 	u64 *gpregp = get_gp_regp(vcpu, imm);
 	u64 *sysregp = get_sys_regp(vcpu, imm);
+	u64 vtimer_reg;
 	u64 val;
 	int ret = 1;
 
@@ -119,7 +153,11 @@ static int handle_msr_pv(struct kvm_vcpu *vcpu)
 				val, get_gpreg_num(imm),
 				is_el2_reg(imm));
 
-	*sysregp = val;
+	vtimer_reg = is_vtimer_regs(imm);
+	if (vtimer_reg)
+		kvm_arm_timer_set_reg(vcpu, vtimer_reg, val);
+	else
+		*sysregp = val;
 
 	return ret;
 }

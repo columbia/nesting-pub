@@ -334,6 +334,9 @@
 #define ELR_EL2_PV	132	/* Exception Link Register (EL2) */
 #define SP_EL2_PV	133	/* Stack Pointer (EL2) */
 
+#define CNTV_CTL_EL02	134
+#define CNTV_CVAL_EL02	135
+
 #define SPSR_EL2	1	/* Saved Program Status Register (EL2) */
 #define ELR_EL2		2	/* Exception Link Register (EL2) */
 #define SP_EL2		3	/* Stack Pointer (EL2) */
