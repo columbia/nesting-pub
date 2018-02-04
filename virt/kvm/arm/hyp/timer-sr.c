@@ -54,7 +54,10 @@ void __hyp_text __timer_enable_traps(struct kvm_vcpu *vcpu)
 		 */
 		val = read_sysreg(cnthctl_el2);
 		val &= ~CNTHCTL_EL1PCEN;
-		val |= CNTHCTL_EL1PCTEN;
+		if (!vcpu_vhe_host(vcpu))
+			val |= CNTHCTL_EL1PCTEN;
+		else
+			val &= ~CNTHCTL_EL1PCTEN;
 		write_sysreg(val, cnthctl_el2);
 	}
 }

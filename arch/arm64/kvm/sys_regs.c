@@ -948,6 +948,21 @@ static bool access_cntv_cval(struct kvm_vcpu *vcpu,
 
 	return true;
 }
+
+static bool access_cntpct(struct kvm_vcpu *vcpu,
+			  struct sys_reg_params *p,
+			  const struct sys_reg_desc *r)
+{
+	/*
+	 * To match the physical count value to the virtual one from
+	 * the perspective of the guest, we apply the virtual offest.
+	 */
+	if (!p->is_write)
+		p->regval = kvm_phys_timer_read() - vcpu_vtimer(vcpu)->cntvoff;
+
+	return true;
+}
+
 static bool access_cntp_tval(struct kvm_vcpu *vcpu,
 		struct sys_reg_params *p,
 		const struct sys_reg_desc *r)
@@ -1576,6 +1591,8 @@ static const struct sys_reg_desc sys_reg_descs[] = {
 
 	{ SYS_DESC(SYS_TPIDR_EL0), NULL, reset_unknown, TPIDR_EL0 },
 	{ SYS_DESC(SYS_TPIDRRO_EL0), NULL, reset_unknown, TPIDRRO_EL0 },
+
+	{ SYS_DESC(SYS_CNTPCT_EL0), access_cntpct},
 
 	{ SYS_DESC(SYS_CNTP_TVAL_EL0), access_cntp_tval },
 	{ SYS_DESC(SYS_CNTP_CTL_EL0), access_cntp_ctl },
