@@ -26,6 +26,7 @@
 #include <clocksource/arm_arch_timer.h>
 #include <asm/arch_timer.h>
 #include <asm/kvm_hyp.h>
+#include <asm/kvm_emulate.h>
 
 #include <kvm/arm_vgic.h>
 #include <kvm/arm_arch_timer.h>
@@ -49,7 +50,8 @@ static const struct kvm_irq_level default_vtimer_irq = {
 static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx);
 static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
 				 struct arch_timer_context *timer_ctx);
-static bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx);
+static bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
+				  struct arch_timer_context *timer_ctx);
 
 u64 kvm_phys_timer_read(void)
 {
@@ -135,12 +137,27 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
 	kvm_vcpu_wake_up(vcpu);
 }
 
-static u64 kvm_timer_compute_delta(struct arch_timer_context *timer_ctx)
+static u64 kvm_timer_cntvoff(struct kvm_vcpu *vcpu,
+			     struct arch_timer_context *timer_ctx)
+{
+	if (timer_ctx == vcpu_vtimer(vcpu))
+		return timer_ctx->cntvoff + kvm_get_vcntvoff(vcpu);
+
+	return 0;
+}
+
+static u64 kvm_timer_now(struct kvm_vcpu *vcpu, struct arch_timer_context *timer_ctx)
+{
+	return kvm_phys_timer_read() - kvm_timer_cntvoff(vcpu, timer_ctx);
+}
+
+static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu,
+				   struct arch_timer_context *timer_ctx)
 {
 	u64 cval, now;
 
 	cval = timer_ctx->cnt_cval;
-	now = kvm_phys_timer_read() - timer_ctx->cntvoff;
+	now = kvm_timer_now(vcpu, timer_ctx);
 
 	if (now < cval) {
 		u64 ns;
@@ -172,10 +189,10 @@ static u64 kvm_timer_earliest_exp(struct kvm_vcpu *vcpu)
 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
 
 	if (kvm_timer_irq_can_fire(vtimer))
-		min_virt = kvm_timer_compute_delta(vtimer);
+		min_virt = kvm_timer_compute_delta(vcpu, vtimer);
 
 	if (kvm_timer_irq_can_fire(ptimer))
-		min_phys = kvm_timer_compute_delta(ptimer);
+		min_phys = kvm_timer_compute_delta(vcpu, ptimer);
 
 	/* If none of timers can fire, then return 0 */
 	if ((min_virt == ULLONG_MAX) && (min_phys == ULLONG_MAX))
@@ -224,7 +241,7 @@ static enum hrtimer_restart kvm_phys_timer_expire(struct hrtimer *hrt)
 	 * PoV (NTP on the host may have forced it to expire
 	 * early). If not ready, schedule for a later time.
 	 */
-	ns = kvm_timer_compute_delta(ptimer);
+	ns = kvm_timer_compute_delta(vcpu, ptimer);
 	if (unlikely(ns)) {
 		hrtimer_forward_now(hrt, ns_to_ktime(ns));
 		return HRTIMER_RESTART;
@@ -234,7 +251,8 @@ static enum hrtimer_restart kvm_phys_timer_expire(struct hrtimer *hrt)
 	return HRTIMER_NORESTART;
 }
 
-static bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
+static bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
+				  struct arch_timer_context *timer_ctx)
 {
 	u64 cval, now;
 
@@ -242,7 +260,7 @@ static bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
 		return false;
 
 	cval = timer_ctx->cnt_cval;
-	now = kvm_phys_timer_read() - timer_ctx->cntvoff;
+	now = kvm_timer_now(vcpu, timer_ctx);
 
 	return cval <= now;
 }
@@ -260,10 +278,10 @@ bool kvm_timer_is_pending(struct kvm_vcpu *vcpu)
 	 * the software view of the timer state is up to date (timer->loaded
 	 * is false), and so we can simply check if the timer should fire now.
 	 */
-	if (!vtimer->loaded && kvm_timer_should_fire(vtimer))
+	if (!vtimer->loaded && kvm_timer_should_fire(vcpu, vtimer))
 		return true;
 
-	return kvm_timer_should_fire(ptimer);
+	return kvm_timer_should_fire(vcpu, ptimer);
 }
 
 /*
@@ -311,7 +329,7 @@ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
 
-	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
+	if (kvm_timer_should_fire(vcpu, ptimer) != ptimer->irq.level)
 		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
 
 	/*
@@ -319,12 +337,12 @@ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
 	 * don't need to have a soft timer scheduled for the future.  If the
 	 * timer cannot fire at all, then we also don't need a soft timer.
 	 */
-	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
+	if (kvm_timer_should_fire(vcpu, ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
 		soft_timer_cancel(&timer->phys_timer, NULL);
 		return;
 	}
 
-	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(ptimer));
+	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(vcpu, ptimer));
 }
 
 /*
@@ -340,7 +358,7 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
 	if (unlikely(!timer->enabled))
 		return;
 
-	if (kvm_timer_should_fire(vtimer) != vtimer->irq.level)
+	if (kvm_timer_should_fire(vcpu, vtimer) != vtimer->irq.level)
 		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
 
 	phys_timer_emulate(vcpu);
@@ -389,7 +407,7 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
 	 * already expired, because kvm_vcpu_block will return before putting
 	 * the thread to sleep.
 	 */
-	if (kvm_timer_should_fire(vtimer) || kvm_timer_should_fire(ptimer))
+	if (kvm_timer_should_fire(vcpu, vtimer) || kvm_timer_should_fire(vcpu, ptimer))
 		return;
 
 	/*
@@ -452,6 +470,13 @@ static void set_cntvoff(u64 cntvoff)
 	kvm_call_hyp(__kvm_timer_set_cntvoff, low, high);
 }
 
+void kvm_timer_reset_cntvoff(struct kvm_vcpu *vcpu)
+{
+	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+
+	set_cntvoff(vtimer->cntvoff + kvm_get_vcntvoff(vcpu));
+}
+
 static void kvm_timer_vcpu_load_vgic(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
@@ -485,7 +510,7 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
 	else
 		kvm_timer_vcpu_load_vgic(vcpu);
 
-	set_cntvoff(vtimer->cntvoff);
+	set_cntvoff(vtimer->cntvoff + kvm_get_vcntvoff(vcpu));
 
 	vtimer_restore_state(vcpu);
 
@@ -581,7 +606,7 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
 	if (vtimer->irq.level) {
 		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
 		vtimer->cnt_cval = read_sysreg_el0(cntv_cval);
-		if (!kvm_timer_should_fire(vtimer)) {
+		if (!kvm_timer_should_fire(vcpu, vtimer)) {
 			kvm_timer_update_irq(vcpu, false, vtimer);
 			unmask_vtimer_irq(vcpu);
 		}
@@ -681,7 +706,7 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
 	return 0;
 }
 
-static u64 read_timer_ctl(struct arch_timer_context *timer)
+static u64 read_timer_ctl(struct kvm_vcpu *vcpu, struct arch_timer_context *timer)
 {
 	/*
 	 * Set ISTATUS bit if it's expired.
@@ -689,7 +714,7 @@ static u64 read_timer_ctl(struct arch_timer_context *timer)
 	 * UNKNOWN when ENABLE bit is 0, so we chose to set ISTATUS bit
 	 * regardless of ENABLE bit for our implementation convenience.
 	 */
-	if (!kvm_timer_compute_delta(timer))
+	if (!kvm_timer_compute_delta(vcpu, timer))
 		return timer->cnt_ctl | ARCH_TIMER_CTRL_IT_STAT;
 	else
 		return timer->cnt_ctl;
@@ -702,13 +727,13 @@ u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
 
 	switch (regid) {
 	case KVM_REG_ARM_TIMER_CTL:
-		return read_timer_ctl(vtimer);
+		return read_timer_ctl(vcpu, vtimer);
 	case KVM_REG_ARM_TIMER_CNT:
 		return kvm_phys_timer_read() - vtimer->cntvoff;
 	case KVM_REG_ARM_TIMER_CVAL:
 		return vtimer->cnt_cval;
 	case KVM_REG_ARM_PTIMER_CTL:
-		return read_timer_ctl(ptimer);
+		return read_timer_ctl(vcpu, ptimer);
 	case KVM_REG_ARM_PTIMER_CVAL:
 		return ptimer->cnt_cval;
 	case KVM_REG_ARM_PTIMER_CNT:

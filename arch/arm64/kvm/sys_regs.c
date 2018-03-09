@@ -1214,6 +1214,9 @@ static bool trap_el2_regs(struct kvm_vcpu *vcpu,
 
 	access_rw(p, sys_reg);
 
+	if (sys_reg == &vcpu_sys_reg(vcpu, CNTVOFF_EL2) && p->is_write)
+		kvm_timer_reset_cntvoff(vcpu);
+
 	return true;
 }
 
