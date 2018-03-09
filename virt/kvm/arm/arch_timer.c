@@ -302,11 +302,17 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
 	}
 }
 
-/* Schedule the background timer for the emulated timer. */
+/*
+ * Check if there was a change in the emulated phys timer state, and
+ * schedule/cancel a soft timer for the emulated phys timer.
+ */
 static void phys_timer_emulate(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+
+	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
+		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
 
 	/*
 	 * If the timer can fire now we have just raised the IRQ line and we
@@ -323,23 +329,19 @@ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
 
 /*
  * Check if there was a change in the timer state, so that we should either
- * raise or lower the line level to the GIC or schedule a background timer to
+ * raise or lower the line level to the GIC or schedule a soft timer to
  * emulate the physical timer.
  */
 static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
 
 	if (unlikely(!timer->enabled))
 		return;
 
 	if (kvm_timer_should_fire(vtimer) != vtimer->irq.level)
 		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
-
-	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
-		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
 
 	phys_timer_emulate(vcpu);
 }
@@ -487,7 +489,6 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
 
 	vtimer_restore_state(vcpu);
 
-	/* Set the background timer for the physical timer emulation. */
 	phys_timer_emulate(vcpu);
 }
 
