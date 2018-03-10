@@ -912,6 +912,60 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
 	{ SYS_DESC(SYS_PMEVTYPERn_EL0(n)),					\
 	  access_pmu_evtyper, reset_unknown, (PMEVTYPER0_EL0 + n), }
 
+static void access_tval(struct kvm_vcpu *vcpu,
+			struct sys_reg_params *p,
+			struct arch_timer_context *timer_ctx)
+{
+	u64 now = kvm_phys_timer_read();
+	u64 reg, cval;
+
+	if (timer_ctx == vcpu_ptimer(vcpu))
+		reg = KVM_REG_ARM_PTIMER_CVAL;
+	else
+		reg = KVM_REG_ARM_TIMER_CVAL;
+
+	if (p->is_write) {
+		kvm_arm_timer_set_reg(vcpu, reg, p->regval + now);
+	} else {
+		cval = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL);
+		p->regval = cval - now;
+	}
+}
+
+static void access_ctl(struct kvm_vcpu *vcpu,
+		       struct sys_reg_params *p,
+		       struct arch_timer_context *timer_ctx)
+{
+	u64 reg;
+
+	if (timer_ctx == vcpu_ptimer(vcpu))
+		reg = KVM_REG_ARM_PTIMER_CTL;
+	else
+		reg = KVM_REG_ARM_TIMER_CTL;
+
+	if (p->is_write)
+		kvm_arm_timer_set_reg(vcpu, reg, p->regval);
+	else
+		p->regval = kvm_arm_timer_get_reg(vcpu, reg);
+}
+
+static void access_cval(struct kvm_vcpu *vcpu,
+			struct sys_reg_params *p,
+			struct arch_timer_context *timer_ctx)
+{
+	u64 reg;
+
+	if (timer_ctx == vcpu_ptimer(vcpu))
+		reg = KVM_REG_ARM_PTIMER_CTL;
+	else
+		reg = KVM_REG_ARM_TIMER_CTL;
+
+	if (p->is_write)
+		kvm_arm_timer_set_reg(vcpu, reg, p->regval);
+	else
+		p->regval = kvm_arm_timer_get_reg(vcpu, reg);
+}
+
 static bool access_cntv_tval(struct kvm_vcpu *vcpu,
 		struct sys_reg_params *p,
 		const struct sys_reg_desc *r)
@@ -964,43 +1018,28 @@ static bool access_cntpct(struct kvm_vcpu *vcpu,
 }
 
 static bool access_cntp_tval(struct kvm_vcpu *vcpu,
-		struct sys_reg_params *p,
-		const struct sys_reg_desc *r)
+			     struct sys_reg_params *p,
+			     const struct sys_reg_desc *r)
 {
-	u64 now = kvm_phys_timer_read();
-	u64 cval;
-
-	if (p->is_write) {
-		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL,
-				      p->regval + now);
-	} else {
-		cval = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL);
-		p->regval = cval - now;
-	}
+	access_tval(vcpu, p, vcpu_ptimer(vcpu));
 
 	return true;
 }
 
 static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
-		struct sys_reg_params *p,
-		const struct sys_reg_desc *r)
+			    struct sys_reg_params *p,
+			    const struct sys_reg_desc *r)
 {
-	if (p->is_write)
-		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CTL, p->regval);
-	else
-		p->regval = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CTL);
+	access_ctl(vcpu, p, vcpu_ptimer(vcpu));
 
 	return true;
 }
 
 static bool access_cntp_cval(struct kvm_vcpu *vcpu,
-		struct sys_reg_params *p,
-		const struct sys_reg_desc *r)
+			     struct sys_reg_params *p,
+			     const struct sys_reg_desc *r)
 {
-	if (p->is_write)
-		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL, p->regval);
-	else
-		p->regval = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL);
+	access_cval(vcpu, p, vcpu_ptimer(vcpu));
 
 	return true;
 }
