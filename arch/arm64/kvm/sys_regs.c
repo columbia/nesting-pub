@@ -916,7 +916,7 @@ static void access_tval(struct kvm_vcpu *vcpu,
 			struct sys_reg_params *p,
 			struct arch_timer_context *timer_ctx)
 {
-	u64 now = kvm_phys_timer_read();
+	u64 now = kvm_timer_now(vcpu, timer_ctx);
 	u64 reg, cval;
 
 	if (timer_ctx == vcpu_ptimer(vcpu))
@@ -971,7 +971,7 @@ static bool access_cntv_tval(struct kvm_vcpu *vcpu,
 		const struct sys_reg_desc *r)
 {
 
-	/* To be done with timer patch series */
+	access_tval(vcpu, p, vcpu_vtimer(vcpu));
 	return true;
 }
 
@@ -979,12 +979,7 @@ static bool access_cntv_ctl(struct kvm_vcpu *vcpu,
 		struct sys_reg_params *p,
 		const struct sys_reg_desc *r)
 {
-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-
-	if (p->is_write)
-		vtimer->cnt_ctl = p->regval;
-	else
-		p->regval = vtimer->cnt_ctl;
+	access_ctl(vcpu, p, vcpu_vtimer(vcpu));
 
 	return true;
 }
@@ -993,12 +988,7 @@ static bool access_cntv_cval(struct kvm_vcpu *vcpu,
 		struct sys_reg_params *p,
 		const struct sys_reg_desc *r)
 {
-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-
-	if (p->is_write)
-		vtimer->cnt_cval = p->regval;
-	else
-		p->regval = vtimer->cnt_cval;
+	access_cval(vcpu, p, vcpu_vtimer(vcpu));
 
 	return true;
 }

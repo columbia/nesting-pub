@@ -86,6 +86,7 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu);
 void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
 
 u64 kvm_phys_timer_read(void);
+u64 kvm_timer_now(struct kvm_vcpu *vcpu, struct arch_timer_context *timer_ctx);
 
 void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu);
 void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
