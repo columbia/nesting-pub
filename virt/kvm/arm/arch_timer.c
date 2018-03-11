@@ -224,28 +224,36 @@ static enum hrtimer_restart kvm_bg_timer_expire(struct hrtimer *hrt)
 	return HRTIMER_NORESTART;
 }
 
-static enum hrtimer_restart kvm_phys_timer_expire(struct hrtimer *hrt)
+static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt,
+					     struct kvm_vcpu *vcpu,
+					     struct arch_timer_context *timer_ctx)
 {
-	struct arch_timer_context *ptimer;
-	struct kvm_vcpu *vcpu;
 	u64 ns;
-
-	ptimer = container_of(hrt, struct arch_timer_context, soft_timer);
-	vcpu = container_of(ptimer, struct kvm_vcpu, arch.timer_cpu.ptimer);
 
 	/*
 	 * Check that the timer has really expired from the guest's
 	 * PoV (NTP on the host may have forced it to expire
 	 * early). If not ready, schedule for a later time.
 	 */
-	ns = kvm_timer_compute_delta(vcpu, ptimer);
+	ns = kvm_timer_compute_delta(vcpu, timer_ctx);
 	if (unlikely(ns)) {
 		hrtimer_forward_now(hrt, ns_to_ktime(ns));
 		return HRTIMER_RESTART;
 	}
 
-	kvm_timer_update_irq(vcpu, true, ptimer);
+	kvm_timer_update_irq(vcpu, true, timer_ctx);
 	return HRTIMER_NORESTART;
+}
+
+static enum hrtimer_restart kvm_phys_timer_expire(struct hrtimer *hrt)
+{
+	struct arch_timer_context *ptimer;
+	struct kvm_vcpu *vcpu;
+
+	ptimer = container_of(hrt, struct arch_timer_context, soft_timer);
+	vcpu = container_of(ptimer, struct kvm_vcpu, arch.timer_cpu.ptimer);
+
+	return kvm_timer_expire(hrt, vcpu, ptimer);
 }
 
 static bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
