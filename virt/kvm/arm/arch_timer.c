@@ -256,6 +256,17 @@ static enum hrtimer_restart kvm_phys_timer_expire(struct hrtimer *hrt)
 	return kvm_timer_expire(hrt, vcpu, ptimer);
 }
 
+static enum hrtimer_restart kvm_virt_timer_expire(struct hrtimer *hrt)
+{
+	struct arch_timer_context *vtimer;
+	struct kvm_vcpu *vcpu;
+
+	vtimer = container_of(hrt, struct arch_timer_context, soft_timer);
+	vcpu = container_of(vtimer, struct kvm_vcpu, arch.timer_cpu.vtimer);
+
+	return kvm_timer_expire(hrt, vcpu, vtimer);
+}
+
 static bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
 				  struct arch_timer_context *timer_ctx)
 {
@@ -756,6 +767,9 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
 
 	hrtimer_init(&ptimer->soft_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
 	ptimer->soft_timer.function = kvm_phys_timer_expire;
+
+	hrtimer_init(&vtimer->soft_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+	vtimer->soft_timer.function = kvm_virt_timer_expire;
 
 	vtimer->irq.irq = default_vtimer_irq.irq;
 	ptimer->irq.irq = default_ptimer_irq.irq;
