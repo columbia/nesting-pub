@@ -233,6 +233,7 @@ int kvm_handle_eret(struct kvm_vcpu *vcpu, struct kvm_run *run)
 	*vcpu_pc(vcpu) = vcpu_el2_sreg(vcpu, ELR_EL2);
 	*vcpu_cpsr(vcpu) = vcpu_el2_sreg(vcpu, SPSR_EL2);
 
+	
 	return 1;
 }
 

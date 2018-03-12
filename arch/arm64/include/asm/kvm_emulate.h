@@ -219,6 +219,14 @@ static inline bool is_hyp_ctxt(const struct kvm_vcpu *vcpu)
 	return false;
 }
 
+static inline bool vcpu_vhe_host(const struct kvm_vcpu *vcpu)
+{
+	if (vcpu_el2_e2h_is_set(vcpu) && is_hyp_ctxt(vcpu))
+		return true;
+
+	return false;
+}
+
 static inline bool vcpu_nested_stage2_enabled(const struct kvm_vcpu *vcpu)
 {
 	return (vcpu_sys_reg(vcpu, HCR_EL2) & HCR_VM);
