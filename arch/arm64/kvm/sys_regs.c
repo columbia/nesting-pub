@@ -1195,6 +1195,19 @@ static u64 *get_special_reg(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
 	};
 }
 
+static void handle_write_to_el2_regs(struct kvm_vcpu *vcpu,
+				     struct sys_reg_params *p, u64 *sysreg)
+{
+	u64 reg = sys_reg(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
+
+	if (p->is_write) {
+		switch(reg) {
+		default:
+			return;
+		}
+	}
+}
+
 static bool trap_el2_regs(struct kvm_vcpu *vcpu,
 			 struct sys_reg_params *p,
 			 const struct sys_reg_desc *r)
@@ -1212,6 +1225,7 @@ static bool trap_el2_regs(struct kvm_vcpu *vcpu,
 	if (!sys_reg)
 		sys_reg = &vcpu_sys_reg(vcpu, r->reg);
 
+	handle_write_to_el2_regs(vcpu, p, sys_reg);
 	access_rw(p, sys_reg);
 
 	return true;
