@@ -104,6 +104,9 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
 		return IRQ_HANDLED;
 
 	vtimer = vcpu_vtimer(vcpu);
+
+	trace_kvm_vtimer_handler(vcpu->vcpu_id, vtimer->irq.level);
+
 	if (!vtimer->irq.level) {
 		cnt_ctl = read_sysreg_el0(cntv_ctl);
 		cnt_ctl &= ARCH_TIMER_CTRL_ENABLE | ARCH_TIMER_CTRL_IT_STAT |
