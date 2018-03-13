@@ -284,14 +284,25 @@ void kvm_timer_update_run(struct kvm_vcpu *vcpu)
 		regs->device_irq_level |= KVM_ARM_DEV_EL1_PTIMER;
 }
 
+static void trace_kvm_timer_update_irq(struct kvm_vcpu *vcpu,
+				       struct arch_timer_context *timer_ctx)
+{
+	if (timer_ctx == vcpu_vtimer(vcpu))
+		trace_kvm_vtimer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
+					    timer_ctx->irq.level);
+	else
+		trace_kvm_ptimer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
+					    timer_ctx->irq.level);
+}
+
 static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
 				 struct arch_timer_context *timer_ctx)
 {
 	int ret;
 
 	timer_ctx->irq.level = new_level;
-	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
-				   timer_ctx->irq.level);
+
+	trace_kvm_timer_update_irq(vcpu, timer_ctx);
 
 	if (likely(irqchip_in_kernel(vcpu->kvm))) {
 		ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,

@@ -259,7 +259,7 @@ TRACE_EVENT(kvm_toggle_cache,
 /*
  * Tracepoints for arch_timer
  */
-TRACE_EVENT(kvm_timer_update_irq,
+TRACE_EVENT(kvm_ptimer_update_irq,
 	TP_PROTO(unsigned long vcpu_id, __u32 irq, int level),
 	TP_ARGS(vcpu_id, irq, level),
 
@@ -275,10 +275,32 @@ TRACE_EVENT(kvm_timer_update_irq,
 		__entry->level		= level;
 	),
 
-	TP_printk("VCPU: %ld, IRQ %d, level %d",
+	TP_printk("ptimer VCPU: %ld, IRQ %d, level %d",
 		  __entry->vcpu_id, __entry->irq, __entry->level)
 );
 
+/*
+ * Tracepoints for arch_timer
+ */
+TRACE_EVENT(kvm_vtimer_update_irq,
+	TP_PROTO(unsigned long vcpu_id, __u32 irq, int level),
+	TP_ARGS(vcpu_id, irq, level),
+
+	TP_STRUCT__entry(
+		__field(	unsigned long,	vcpu_id	)
+		__field(	__u32,		irq	)
+		__field(	int,		level	)
+	),
+
+	TP_fast_assign(
+		__entry->vcpu_id	= vcpu_id;
+		__entry->irq		= irq;
+		__entry->level		= level;
+	),
+
+	TP_printk("vtimer VCPU: %ld, IRQ %d, level %d",
+		  __entry->vcpu_id, __entry->irq, __entry->level)
+);
 #endif /* _TRACE_KVM_H */
 
 #undef TRACE_INCLUDE_PATH
