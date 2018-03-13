@@ -1195,8 +1195,13 @@ static u64 *get_special_reg(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
 	};
 }
 
+#ifndef CONFIG_KVM_ARM_NESTED_PV
 static void handle_hcr_write(struct kvm_vcpu *vcpu,
 			     struct sys_reg_params *p, u64 *sysreg)
+#else
+void handle_hcr_write(struct kvm_vcpu *vcpu,
+		      struct sys_reg_params *p, u64 *sysreg)
+#endif
 {
 	u64 prev, new;
 

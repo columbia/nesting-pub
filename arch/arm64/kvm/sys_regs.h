@@ -150,6 +150,8 @@ const struct sys_reg_desc *find_reg_by_id(u64 id,
 
 #ifdef CONFIG_KVM_ARM_NESTED_PV
 int emulate_sys_instr(struct kvm_vcpu *vcpu, struct sys_reg_params *p);
+void handle_hcr_write(struct kvm_vcpu *vcpu,
+		      struct sys_reg_params *p, u64 *sysreg);
 #endif
 
 #endif /* __ARM64_KVM_SYS_REGS_LOCAL_H__ */

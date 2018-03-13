@@ -137,6 +137,8 @@ static int handle_msr_pv(struct kvm_vcpu *vcpu)
 	u64 *sysregp = get_sys_regp(vcpu, imm);
 	u64 vtimer_reg;
 	u64 val;
+	u32 sreg_num = get_sysreg_num(imm);
+
 	int ret = 1;
 
 	if (IS_ERR(sysregp))
@@ -152,6 +154,13 @@ static int handle_msr_pv(struct kvm_vcpu *vcpu)
 	trace_kvm_nested_msr_pv(vcpu, get_sysreg_num(imm),
 				val, get_gpreg_num(imm),
 				is_el2_reg(imm));
+
+	if (sreg_num == HCR_EL2) {
+		struct sys_reg_params p;
+
+		p.regval = val;
+		handle_hcr_write(vcpu, &p, sysregp);
+	}
 
 	vtimer_reg = is_vtimer_regs(imm);
 	if (vtimer_reg)
