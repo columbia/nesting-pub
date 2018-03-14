@@ -486,7 +486,7 @@ static void kvm_timer_vcpu_load_user(struct kvm_vcpu *vcpu)
 	kvm_vtimer_update_mask_user(vcpu);
 }
 
-void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
+static void kvm_vtimer_vcpu_load(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
@@ -502,6 +502,16 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
 	set_cntvoff(vtimer->cntvoff);
 
 	vtimer_restore_state(vcpu, vtimer);
+}
+
+void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
+{
+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+
+	if (unlikely(!timer->enabled))
+		return;
+
+	kvm_vtimer_vcpu_load(vcpu);
 
 	phys_timer_emulate(vcpu);
 }
@@ -523,7 +533,7 @@ bool kvm_timer_should_notify_user(struct kvm_vcpu *vcpu)
 	       ptimer->irq.level != plevel;
 }
 
-void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+static void kvm_vtimer_vcpu_put(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 
@@ -531,6 +541,24 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
 		return;
 
 	vtimer_save_state(vcpu, vcpu_vtimer(vcpu));
+
+	/*
+	 * The kernel may decide to run userspace after calling vcpu_put, so
+	 * we reset cntvoff to 0 to ensure a consistent read between user
+	 * accesses to the virtual counter and kernel access to the physical
+	 * counter.
+	 */
+	set_cntvoff(0);
+}
+
+void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+{
+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+
+	if (unlikely(!timer->enabled))
+		return;
+
+	kvm_vtimer_vcpu_put(vcpu);
 
 	/*
 	 * Cancel the physical timer emulation, because the only case where we
@@ -542,14 +570,6 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
 	 * coming back to the VCPU thread in kvm_timer_vcpu_load().
 	 */
 	soft_timer_cancel(&timer->phys_timer, NULL);
-
-	/*
-	 * The kernel may decide to run userspace after calling vcpu_put, so
-	 * we reset cntvoff to 0 to ensure a consistent read between user
-	 * accesses to the virtual counter and kernel access to the physical
-	 * counter.
-	 */
-	set_cntvoff(0);
 }
 
 static void unmask_vtimer_irq(struct kvm_vcpu *vcpu)
