@@ -640,7 +640,14 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
 	 * the line at this point.
 	 */
 	if (vtimer->irq.level) {
-		sync_timer_state(vtimer);
+		/*
+		 * When the VM is running the vhe guest hypervisor, the EL1
+		 * virtual timer is emulated, and the vtimer context is
+		 * already up to date.
+		 */
+		if (!vcpu_vhe_host(vcpu))
+			sync_timer_state(vtimer);
+
 		if (!kvm_timer_should_fire(vcpu, vtimer)) {
 			kvm_timer_update_irq(vcpu, false, vtimer);
 			unmask_vtimer_irq(vcpu);
