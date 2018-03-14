@@ -360,27 +360,27 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
 	phys_timer_emulate(vcpu);
 }
 
-static void vtimer_save_state(struct kvm_vcpu *vcpu)
+static void vtimer_save_state(struct kvm_vcpu *vcpu,
+			      struct arch_timer_context *timer_ctx)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 	unsigned long flags;
 
 	local_irq_save(flags);
 
-	if (!vtimer->loaded)
+	if (!timer_ctx->loaded)
 		goto out;
 
 	if (timer->enabled) {
-		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
-		vtimer->cnt_cval = read_sysreg_el0(cntv_cval);
+		timer_ctx->cnt_ctl = read_sysreg_el0(cntv_ctl);
+		timer_ctx->cnt_cval = read_sysreg_el0(cntv_cval);
 	}
 
 	/* Disable the virtual timer */
 	write_sysreg_el0(0, cntv_ctl);
 	isb();
 
-	vtimer->loaded = false;
+	timer_ctx->loaded = false;
 out:
 	local_irq_restore(flags);
 }
@@ -396,7 +396,7 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
 
-	vtimer_save_state(vcpu);
+	vtimer_save_state(vcpu, vtimer);
 
 	/*
 	 * No need to schedule a background timer if any guest timer has
@@ -420,24 +420,24 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
 	soft_timer_start(&timer->bg_timer, kvm_timer_earliest_exp(vcpu));
 }
 
-static void vtimer_restore_state(struct kvm_vcpu *vcpu)
+static void vtimer_restore_state(struct kvm_vcpu *vcpu,
+				 struct arch_timer_context *timer_ctx)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 	unsigned long flags;
 
 	local_irq_save(flags);
 
-	if (vtimer->loaded)
+	if (timer_ctx->loaded)
 		goto out;
 
 	if (timer->enabled) {
-		write_sysreg_el0(vtimer->cnt_cval, cntv_cval);
+		write_sysreg_el0(timer_ctx->cnt_cval, cntv_cval);
 		isb();
-		write_sysreg_el0(vtimer->cnt_ctl, cntv_ctl);
+		write_sysreg_el0(timer_ctx->cnt_ctl, cntv_ctl);
 	}
 
-	vtimer->loaded = true;
+	timer_ctx->loaded = true;
 out:
 	local_irq_restore(flags);
 }
@@ -446,7 +446,7 @@ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 
-	vtimer_restore_state(vcpu);
+	vtimer_restore_state(vcpu, vcpu_vtimer(vcpu));
 
 	soft_timer_cancel(&timer->bg_timer, &timer->expired);
 }
@@ -501,7 +501,7 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
 
 	set_cntvoff(vtimer->cntvoff);
 
-	vtimer_restore_state(vcpu);
+	vtimer_restore_state(vcpu, vtimer);
 
 	phys_timer_emulate(vcpu);
 }
@@ -530,7 +530,7 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
 	if (unlikely(!timer->enabled))
 		return;
 
-	vtimer_save_state(vcpu);
+	vtimer_save_state(vcpu, vcpu_vtimer(vcpu));
 
 	/*
 	 * Cancel the physical timer emulation, because the only case where we
