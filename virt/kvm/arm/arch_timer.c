@@ -531,7 +531,10 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
 	if (unlikely(!timer->enabled))
 		return;
 
-	kvm_vtimer_vcpu_load(vcpu, vcpu_vtimer(vcpu));
+	if (!vcpu_vhe_host(vcpu))
+		kvm_vtimer_vcpu_load(vcpu, vcpu_vtimer(vcpu));
+	else
+		kvm_vtimer_vcpu_load(vcpu, vcpu_vtimer_el2(vcpu));
 
 	phys_timer_emulate(vcpu);
 }
@@ -579,7 +582,10 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
 	if (unlikely(!timer->enabled))
 		return;
 
-	kvm_vtimer_vcpu_put(vcpu, vcpu_vtimer(vcpu));
+	if (!vcpu_vhe_host(vcpu))
+		kvm_vtimer_vcpu_put(vcpu, vcpu_vtimer(vcpu));
+	else
+		kvm_vtimer_vcpu_put(vcpu, vcpu_vtimer_el2(vcpu));
 
 	/*
 	 * Cancel the physical timer emulation, because the only case where we
