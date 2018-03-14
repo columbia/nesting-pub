@@ -486,10 +486,10 @@ static void kvm_timer_vcpu_load_user(struct kvm_vcpu *vcpu)
 	kvm_vtimer_update_mask_user(vcpu);
 }
 
-static void kvm_vtimer_vcpu_load(struct kvm_vcpu *vcpu)
+static void kvm_vtimer_vcpu_load(struct kvm_vcpu *vcpu,
+			  struct arch_timer_context *timer_ctx)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 
 	if (unlikely(!timer->enabled))
 		return;
@@ -499,9 +499,9 @@ static void kvm_vtimer_vcpu_load(struct kvm_vcpu *vcpu)
 	else
 		kvm_timer_vcpu_load_vgic(vcpu);
 
-	set_cntvoff(vtimer->cntvoff);
+	set_cntvoff(timer_ctx->cntvoff);
 
-	vtimer_restore_state(vcpu, vtimer);
+	vtimer_restore_state(vcpu, timer_ctx);
 }
 
 void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
@@ -511,7 +511,7 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
 	if (unlikely(!timer->enabled))
 		return;
 
-	kvm_vtimer_vcpu_load(vcpu);
+	kvm_vtimer_vcpu_load(vcpu, vcpu_vtimer(vcpu));
 
 	phys_timer_emulate(vcpu);
 }
@@ -533,14 +533,15 @@ bool kvm_timer_should_notify_user(struct kvm_vcpu *vcpu)
 	       ptimer->irq.level != plevel;
 }
 
-static void kvm_vtimer_vcpu_put(struct kvm_vcpu *vcpu)
+void kvm_vtimer_vcpu_put(struct kvm_vcpu *vcpu,
+			 struct arch_timer_context *timer_ctx)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 
 	if (unlikely(!timer->enabled))
 		return;
 
-	vtimer_save_state(vcpu, vcpu_vtimer(vcpu));
+	vtimer_save_state(vcpu, timer_ctx);
 
 	/*
 	 * The kernel may decide to run userspace after calling vcpu_put, so
@@ -558,7 +559,7 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
 	if (unlikely(!timer->enabled))
 		return;
 
-	kvm_vtimer_vcpu_put(vcpu);
+	kvm_vtimer_vcpu_put(vcpu, vcpu_vtimer(vcpu));
 
 	/*
 	 * Cancel the physical timer emulation, because the only case where we
