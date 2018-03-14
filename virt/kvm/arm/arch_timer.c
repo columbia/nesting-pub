@@ -499,7 +499,7 @@ static void kvm_timer_vcpu_load_user(struct kvm_vcpu *vcpu)
 	kvm_vtimer_update_mask_user(vcpu);
 }
 
-static void kvm_vtimer_vcpu_load(struct kvm_vcpu *vcpu,
+void kvm_vtimer_vcpu_load(struct kvm_vcpu *vcpu,
 			  struct arch_timer_context *timer_ctx)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;

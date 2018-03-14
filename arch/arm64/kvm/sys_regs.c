@@ -1195,6 +1195,24 @@ static u64 *get_special_reg(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
 	};
 }
 
+static void handle_hcr_write(struct kvm_vcpu *vcpu,
+			     struct sys_reg_params *p, u64 *sysreg)
+{
+	u64 prev, new;
+
+	prev = *sysreg;
+	new = p->regval;
+
+	/*
+	 * This is the first time we get to know that we need to support the EL2
+	 * virtual timer.
+	 */
+	if (!(prev & HCR_E2H) && (new & HCR_E2H)) {
+		kvm_vtimer_vcpu_put(vcpu, vcpu_vtimer(vcpu));
+		kvm_vtimer_vcpu_load(vcpu, vcpu_vtimer_el2(vcpu));
+	}
+}
+
 static void handle_write_to_el2_regs(struct kvm_vcpu *vcpu,
 				     struct sys_reg_params *p, u64 *sysreg)
 {
@@ -1202,6 +1220,9 @@ static void handle_write_to_el2_regs(struct kvm_vcpu *vcpu,
 
 	if (p->is_write) {
 		switch(reg) {
+		case SYS_HCR_EL2:
+			handle_hcr_write(vcpu, p, sysreg);
+			return;
 		default:
 			return;
 		}

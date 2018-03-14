@@ -89,6 +89,11 @@ u64 kvm_phys_timer_read(void);
 void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu);
 void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
 
+void kvm_vtimer_vcpu_load(struct kvm_vcpu *vcpu,
+			  struct arch_timer_context *timer_ctx);
+void kvm_vtimer_vcpu_put(struct kvm_vcpu *vcpu,
+			 struct arch_timer_context *timer_ctx);
+
 void kvm_timer_init_vhe(void);
 
 #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.vtimer)

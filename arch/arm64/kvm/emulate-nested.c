@@ -56,6 +56,7 @@ static int kvm_inject_nested(struct kvm_vcpu *vcpu, u64 esr_el2,
 			     enum exception_type type)
 {
 	int ret = 1;
+	bool prev_vhe_host = vcpu_vhe_host(vcpu);
 
 	if (!nested_virt_in_use(vcpu)) {
 		kvm_err("Unexpected call to %s for the non-nesting configuration\n",
@@ -73,6 +74,11 @@ static int kvm_inject_nested(struct kvm_vcpu *vcpu, u64 esr_el2,
 	*vcpu_cpsr(vcpu) |=  (PSR_A_BIT | PSR_F_BIT | PSR_I_BIT | PSR_D_BIT);
 
 	trace_kvm_inject_nested_exception(vcpu, esr_el2, *vcpu_pc(vcpu));
+
+	if (!prev_vhe_host && vcpu_vhe_host(vcpu)) {
+		kvm_vtimer_vcpu_put(vcpu, vcpu_vtimer(vcpu));
+		kvm_vtimer_vcpu_load(vcpu, vcpu_vtimer_el2(vcpu));
+	}
 
 	return ret;
 }

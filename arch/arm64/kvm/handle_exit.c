@@ -234,6 +234,11 @@ int kvm_handle_eret(struct kvm_vcpu *vcpu, struct kvm_run *run)
 	*vcpu_cpsr(vcpu) = vcpu_el2_sreg(vcpu, SPSR_EL2);
 
 	
+	if (!vcpu_vhe_host(vcpu)) {
+		kvm_vtimer_vcpu_put(vcpu, vcpu_vtimer_el2(vcpu));
+		kvm_vtimer_vcpu_load(vcpu, vcpu_vtimer(vcpu));
+	}
+
 	return 1;
 }
 
