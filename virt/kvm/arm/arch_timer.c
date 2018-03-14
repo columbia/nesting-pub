@@ -497,10 +497,14 @@ static void kvm_vtimer_vcpu_load(struct kvm_vcpu *vcpu,
 	if (unlikely(!timer->enabled))
 		return;
 
-	if (unlikely(!irqchip_in_kernel(vcpu->kvm)))
-		kvm_timer_vcpu_load_user(vcpu);
-	else
-		kvm_timer_vcpu_load_vgic(vcpu);
+	if (!vcpu_vhe_host(vcpu)) {
+		if (unlikely(!irqchip_in_kernel(vcpu->kvm)))
+			kvm_timer_vcpu_load_user(vcpu);
+		else
+			kvm_timer_vcpu_load_vgic(vcpu);
+	} else {
+		/* TODO: We need an equivalent of this for the el2 virt timer */
+	}
 
 	set_cntvoff(timer_ctx->cntvoff);
 
