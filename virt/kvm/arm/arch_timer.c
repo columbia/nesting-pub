@@ -409,7 +409,10 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
 
-	vtimer_save_state(vcpu, vtimer);
+	if (!vcpu_vhe_host(vcpu))
+		vtimer_save_state(vcpu, vtimer);
+	else
+		vtimer_save_state(vcpu, vcpu_vtimer_el2(vcpu));
 
 	/*
 	 * No need to schedule a background timer if any guest timer has
@@ -459,7 +462,10 @@ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 
-	vtimer_restore_state(vcpu, vcpu_vtimer(vcpu));
+	if (!vcpu_vhe_host(vcpu))
+		vtimer_restore_state(vcpu, vcpu_vtimer(vcpu));
+	else
+		vtimer_restore_state(vcpu, vcpu_vtimer_el2(vcpu));
 
 	soft_timer_cancel(&timer->bg_timer, &timer->expired);
 }
