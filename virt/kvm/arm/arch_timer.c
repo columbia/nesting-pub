@@ -576,6 +576,12 @@ static void unmask_vtimer_irq(struct kvm_vcpu *vcpu)
 	}
 }
 
+static void sync_timer_state(struct arch_timer_context *timer_ctx)
+{
+	timer_ctx->cnt_ctl = read_sysreg_el0(cntv_ctl);
+	timer_ctx->cnt_cval = read_sysreg_el0(cntv_cval);
+}
+
 /**
  * kvm_timer_sync_hwstate - sync timer state from cpu
  * @vcpu: The vcpu pointer
@@ -593,8 +599,7 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
 	 * the line at this point.
 	 */
 	if (vtimer->irq.level) {
-		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
-		vtimer->cnt_cval = read_sysreg_el0(cntv_cval);
+		sync_timer_state(vtimer);
 		if (!kvm_timer_should_fire(vtimer)) {
 			kvm_timer_update_irq(vcpu, false, vtimer);
 			unmask_vtimer_irq(vcpu);
