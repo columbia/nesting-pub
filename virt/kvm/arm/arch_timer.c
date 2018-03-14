@@ -139,13 +139,23 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
 	kvm_vcpu_wake_up(vcpu);
 }
 
+u64 kvm_timer_now(struct kvm_vcpu *vcpu, struct arch_timer_context *timer_ctx)
+{
+	u64 cntvoff = timer_ctx->cntvoff;
+
+	if (timer_ctx == vcpu_vtimer(vcpu))
+		cntvoff = timer_ctx->cntvoff + kvm_get_vcntvoff(vcpu);
+
+	return kvm_phys_timer_read() - cntvoff;
+}
+
 static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu,
 				   struct arch_timer_context *timer_ctx)
 {
 	u64 cval, now;
 
 	cval = timer_ctx->cnt_cval;
-	now = kvm_phys_timer_read() - timer_ctx->cntvoff;
+	now = kvm_timer_now(vcpu, timer_ctx);
 
 	if (now < cval) {
 		u64 ns;
@@ -248,7 +258,7 @@ static bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
 		return false;
 
 	cval = timer_ctx->cnt_cval;
-	now = kvm_phys_timer_read() - timer_ctx->cntvoff;
+	now = kvm_timer_now(vcpu, timer_ctx);
 
 	return cval <= now;
 }
@@ -493,6 +503,7 @@ static void kvm_vtimer_vcpu_load(struct kvm_vcpu *vcpu,
 			  struct arch_timer_context *timer_ctx)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+	u64 cntvoff = timer_ctx->cntvoff;
 
 	if (unlikely(!timer->enabled))
 		return;
@@ -502,11 +513,13 @@ static void kvm_vtimer_vcpu_load(struct kvm_vcpu *vcpu,
 			kvm_timer_vcpu_load_user(vcpu);
 		else
 			kvm_timer_vcpu_load_vgic(vcpu);
+
+		cntvoff += kvm_get_vcntvoff(vcpu);
 	} else {
 		/* TODO: We need an equivalent of this for the el2 virt timer */
 	}
 
-	set_cntvoff(timer_ctx->cntvoff);
+	set_cntvoff(cntvoff);
 
 	vtimer_restore_state(vcpu, timer_ctx);
 }
