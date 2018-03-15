@@ -305,10 +305,12 @@ static void trace_kvm_timer_update_irq(struct kvm_vcpu *vcpu,
 {
 	if (timer_ctx == vcpu_vtimer(vcpu))
 		trace_kvm_vtimer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
-					    timer_ctx->irq.level);
+					    timer_ctx->irq.level,
+					    timer_ctx->cnt_cval);
 	else
 		trace_kvm_ptimer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
-					    timer_ctx->irq.level);
+					    timer_ctx->irq.level,
+					    timer_ctx->cnt_cval);
 }
 
 static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,

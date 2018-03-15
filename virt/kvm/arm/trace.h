@@ -260,46 +260,50 @@ TRACE_EVENT(kvm_toggle_cache,
  * Tracepoints for arch_timer
  */
 TRACE_EVENT(kvm_ptimer_update_irq,
-	TP_PROTO(unsigned long vcpu_id, __u32 irq, int level),
-	TP_ARGS(vcpu_id, irq, level),
+	TP_PROTO(unsigned long vcpu_id, __u32 irq, int level, u64 cval),
+	TP_ARGS(vcpu_id, irq, level, cval),
 
 	TP_STRUCT__entry(
 		__field(	unsigned long,	vcpu_id	)
 		__field(	__u32,		irq	)
 		__field(	int,		level	)
+		__field(	u64,		cval	)
 	),
 
 	TP_fast_assign(
 		__entry->vcpu_id	= vcpu_id;
 		__entry->irq		= irq;
 		__entry->level		= level;
+		__entry->cval		= cval;
 	),
 
-	TP_printk("ptimer VCPU: %ld, IRQ %d, level %d",
-		  __entry->vcpu_id, __entry->irq, __entry->level)
+	TP_printk("ptimer VCPU: %ld, IRQ %d, level %d, cval %llx",
+		  __entry->vcpu_id, __entry->irq, __entry->level, __entry->cval)
 );
 
 /*
  * Tracepoints for arch_timer
  */
 TRACE_EVENT(kvm_vtimer_update_irq,
-	TP_PROTO(unsigned long vcpu_id, __u32 irq, int level),
-	TP_ARGS(vcpu_id, irq, level),
+	TP_PROTO(unsigned long vcpu_id, __u32 irq, int level, u64 cval),
+	TP_ARGS(vcpu_id, irq, level, cval),
 
 	TP_STRUCT__entry(
 		__field(	unsigned long,	vcpu_id	)
 		__field(	__u32,		irq	)
 		__field(	int,		level	)
+		__field(	u64,		cval	)
 	),
 
 	TP_fast_assign(
 		__entry->vcpu_id	= vcpu_id;
 		__entry->irq		= irq;
 		__entry->level		= level;
+		__entry->cval		= cval;
 	),
 
-	TP_printk("vtimer VCPU: %ld, IRQ %d, level %d",
-		  __entry->vcpu_id, __entry->irq, __entry->level)
+	TP_printk("vtimer VCPU: %ld, IRQ %d, level %d, cval %llx",
+		  __entry->vcpu_id, __entry->irq, __entry->level, __entry->cval)
 );
 
 /*
