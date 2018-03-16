@@ -242,6 +242,27 @@ TRACE_EVENT(kvm_inject_nested_exception,
 		  __entry->vcpu, __entry->esr_el2, __entry->pc)
 );
 
+TRACE_EVENT(inject_exception_vEL2,
+	    TP_PROTO(struct kvm_vcpu *vcpu, unsigned long pc,
+		     enum exception_type type),
+	TP_ARGS(vcpu, pc, type),
+
+	TP_STRUCT__entry(
+		__field(struct kvm_vcpu *,	vcpu)
+		__field(unsigned long,		pc)
+		__field(enum exception_type,	type)
+	),
+
+	TP_fast_assign(
+		__entry->vcpu = vcpu;
+		__entry->pc = pc;
+		__entry->type = type;
+	),
+
+	TP_printk("vcpu: %d, prev PC: 0x%016lx, type: %x",
+		  __entry->vcpu->vcpu_id, __entry->pc, __entry->type)
+);
+
 TRACE_EVENT(kvm_nested_eret,
 	TP_PROTO(struct kvm_vcpu *vcpu, unsigned long elr_el2,
 		 unsigned long spsr_el2),
@@ -262,6 +283,25 @@ TRACE_EVENT(kvm_nested_eret,
 	TP_printk("vcpu: %p, eret to elr_el2: 0x%016lx, with spsr_el2: 0x%08lx",
 		  __entry->vcpu, __entry->elr_el2, __entry->spsr_el2)
 );
+
+TRACE_EVENT(eret_l2vm,
+	TP_PROTO(struct kvm_vcpu *vcpu, unsigned long elr_el2),
+	TP_ARGS(vcpu, elr_el2),
+
+	TP_STRUCT__entry(
+		__field(struct kvm_vcpu *,	vcpu)
+		__field(unsigned long,		elr_el2)
+	),
+
+	TP_fast_assign(
+		__entry->vcpu = vcpu;
+		__entry->elr_el2 = elr_el2;
+	),
+
+	TP_printk("vcpu: %d, PC: 0x%016lx",
+		  __entry->vcpu->vcpu_id, __entry->elr_el2)
+);
+
 #endif /* _TRACE_ARM64_KVM_H */
 
 #undef TRACE_INCLUDE_PATH

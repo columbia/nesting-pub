@@ -74,6 +74,7 @@ static int kvm_inject_nested(struct kvm_vcpu *vcpu, u64 esr_el2,
 	*vcpu_cpsr(vcpu) |=  (PSR_A_BIT | PSR_F_BIT | PSR_I_BIT | PSR_D_BIT);
 
 	trace_kvm_inject_nested_exception(vcpu, esr_el2, *vcpu_pc(vcpu));
+	trace_inject_exception_vEL2(vcpu, vcpu_el2_sreg(vcpu, ELR_EL2), type);
 
 	if (!prev_vhe_host && vcpu_vhe_host(vcpu)) {
 		kvm_vtimer_vcpu_put(vcpu, vcpu_vtimer(vcpu));
