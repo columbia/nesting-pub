@@ -72,6 +72,8 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
 	if (!base)
 		return;
 
+	cpu_if->vgic_vmcr = readl_relaxed(base + GICH_VMCR);
+
 	if (vcpu->arch.vgic_cpu.live_lrs) {
 		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
 
@@ -118,6 +120,7 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
                 }
 	}
 	vcpu->arch.vgic_cpu.live_lrs = live_lrs;
+	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
 }
 
 #ifdef CONFIG_ARM64
