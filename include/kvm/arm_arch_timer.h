@@ -43,6 +43,10 @@ struct arch_timer_context {
 
 	/* Virtual offset */
 	u64			cntvoff;
+
+	bool			started;
+
+	u64			cached_vcntvoff;
 };
 
 struct arch_timer_cpu {
@@ -95,6 +99,10 @@ void kvm_vtimer_vcpu_put(struct kvm_vcpu *vcpu,
 			 struct arch_timer_context *timer_ctx);
 
 void kvm_timer_init_vhe(void);
+
+int kvm_vtimer_check(struct kvm_vcpu *vcpu);
+
+u64 kvm_timer_now(struct kvm_vcpu *vcpu, struct arch_timer_context *timer_ctx);
 
 #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.vtimer)
 #define vcpu_vtimer_el2(v)	(&(v)->arch.timer_cpu.vtimer_el2)

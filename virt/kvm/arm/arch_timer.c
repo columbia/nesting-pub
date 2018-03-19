@@ -1041,3 +1041,60 @@ int kvm_arm_timer_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
 
 	return -ENXIO;
 }
+
+int kvm_vtimer_check(struct kvm_vcpu *vcpu)
+{
+	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+	u64 cval, now, cntvoff, ctl;
+	u64 diff_allowed = 200 * 1000 * 1000; /* 400 ms */
+
+	if (vtimer->loaded) {
+		cval = read_sysreg_el0(cntv_cval);
+		ctl = read_sysreg_el0(cntv_ctl);
+	} else {
+		cval = vtimer->cnt_cval;
+		ctl = vtimer->cnt_ctl;
+	}
+
+	if (cval) {
+		/*
+		 * Once it's started, it never gets back to not-started. This is
+		 * to catch unexpected cval reset to 0.
+		 */
+		vtimer->started = true;
+	}
+
+	/* vtimer is not started yet */
+	if (!vtimer->started)
+		return 0;
+
+	if (!(ctl & ARCH_TIMER_CTRL_ENABLE))
+		return 0;
+	/*
+	 * Regardless of the virtual cntvoff_el2 (and vtimer enable status), we
+	 * always check if the vtimer needs to fire.
+	 */
+	cntvoff = vtimer->cntvoff + vtimer->cached_vcntvoff; now =
+	kvm_phys_timer_read() - cntvoff;
+
+	if (now > cval + diff_allowed) {
+		u64 ns;
+
+		ns = cyclecounter_cyc2ns(timecounter->cc,
+					 now - cval,
+					 timecounter->mask,
+					 &timecounter->frac);
+
+		trace_printk("[%d] Stop the VM due to unexpected vtimer behavior\n", vcpu->vcpu_id);
+		trace_printk("[%d] cval: 0x%llx, now: 0x%llx, diff: %lld ns\n",
+			     vcpu->vcpu_id, cval, now, ns);
+
+		kvm_err("Stop the VM due to unexpected vtimer behavior\n");
+		kvm_err("cval: 0x%llx, now: 0x%llx, diff: %lld ns\n",
+			     cval, now, ns);
+
+		return 0;
+	}
+
+	return 0;
+}
