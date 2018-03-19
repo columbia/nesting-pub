@@ -442,7 +442,11 @@ static void vtimer_restore_state(struct kvm_vcpu *vcpu,
 				 struct arch_timer_context *timer_ctx)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 	unsigned long flags;
+
+	if (timer_ctx != vtimer)
+		return;
 
 	local_irq_save(flags);
 
