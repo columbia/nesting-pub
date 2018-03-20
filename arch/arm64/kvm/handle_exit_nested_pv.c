@@ -23,8 +23,6 @@
 #include <asm/kvm_nested_pv.h>
 #include <asm/kvm_hyp.h>
 
-#include <kvm/arm_arch_timer.h>
-
 #include "sys_regs.h"
 
 #include "trace.h"
@@ -162,9 +160,6 @@ static int handle_msr_pv(struct kvm_vcpu *vcpu)
 
 		p.regval = val;
 		handle_hcr_write(vcpu, &p, sysregp);
-	} else if (sreg_num == CNTVOFF_EL2) {
-		if (val)
-			vcpu_vtimer(vcpu)->cached_vcntvoff = val;
 	}
 
 	vtimer_reg = is_vtimer_regs(imm);
@@ -309,11 +304,6 @@ int handle_debug(struct kvm_vcpu *vcpu)
 
 	if (imm == 0xeeee)
 		BUG();
-
-	if (imm == 0xe201)
-		trace_printk("now: 0x%08llx, vcontvoff: 0x%08llx\n",
-			     kvm_timer_now(vcpu, vcpu_vtimer(vcpu)),
-			     vcpu_sys_reg(vcpu, CNTVOFF_EL2));
 
 	return 1;
 }

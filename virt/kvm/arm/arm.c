@@ -729,9 +729,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 		trace_kvm_entry(*vcpu_pc(vcpu), kvm_guest_state(vcpu));
 		guest_enter_irqoff();
 
-		if (kvm_vtimer_check(vcpu))
-			return -1;
-
 		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
 
 		vcpu->mode = OUTSIDE_GUEST_MODE;
