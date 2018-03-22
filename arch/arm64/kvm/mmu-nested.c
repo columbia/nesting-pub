@@ -398,6 +398,8 @@ static struct kvm_nested_s2_mmu *create_nested_mmu(struct kvm_vcpu *vcpu,
 	spin_lock(&vcpu->kvm->mmu_lock);
 	tmp_mmu = lookup_nested_mmu(vcpu, vttbr);
 	if (!tmp_mmu) {
+		/* The virtual VMID will be used as a key when searching a mmu */
+		nested_mmu->virtual_vttbr = vttbr;
 		list_add_rcu(&nested_mmu->list, nested_mmu_list);
 	} else {
 		/*
@@ -413,9 +415,6 @@ static struct kvm_nested_s2_mmu *create_nested_mmu(struct kvm_vcpu *vcpu,
 		kfree(nested_mmu);
 		nested_mmu = tmp_mmu;
 	}
-
-	/* The virtual VMID will be used as a key when searching a mmu */
-	nested_mmu->virtual_vttbr = vttbr;
 
 	return nested_mmu;
 }
