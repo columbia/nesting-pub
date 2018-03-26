@@ -95,6 +95,9 @@ void kvm_vtimer_vcpu_load(struct kvm_vcpu *vcpu,
 			  struct arch_timer_context *timer_ctx);
 void kvm_vtimer_vcpu_put(struct kvm_vcpu *vcpu,
 			 struct arch_timer_context *timer_ctx);
+void kvm_timer_emulate(struct kvm_vcpu *vcpu,
+		       struct arch_timer_context *timer_ctx);
+void kvm_timer_cancel(struct arch_timer_context *timer_ctx);
 
 void kvm_timer_init_vhe(void);
 

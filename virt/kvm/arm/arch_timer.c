@@ -353,8 +353,8 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
  * Check if there was a change in the emulated phys timer state, and
  * schedule/cancel a soft timer for the emulated phys timer.
  */
-static void kvm_timer_emulate(struct kvm_vcpu *vcpu,
-			      struct arch_timer_context *timer_ctx)
+void kvm_timer_emulate(struct kvm_vcpu *vcpu,
+		       struct arch_timer_context *timer_ctx)
 {
 	if (kvm_timer_should_fire(vcpu, timer_ctx) != timer_ctx->irq.level)
 		kvm_timer_update_irq(vcpu, !timer_ctx->irq.level, timer_ctx);
@@ -372,6 +372,11 @@ static void kvm_timer_emulate(struct kvm_vcpu *vcpu,
 
 	soft_timer_start(&timer_ctx->soft_timer,
 			 kvm_timer_compute_delta(vcpu, timer_ctx));
+}
+
+void kvm_timer_cancel(struct arch_timer_context *timer_ctx)
+{
+	soft_timer_cancel(&timer_ctx->soft_timer, NULL);
 }
 
 /*
