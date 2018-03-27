@@ -310,21 +310,23 @@ TRACE_EVENT(kvm_vtimer_update_irq,
  * Tracepoints for vtimer handler
  */
 TRACE_EVENT(kvm_vtimer_handler,
-	TP_PROTO(unsigned long vcpu_id, int level),
-	TP_ARGS(vcpu_id, level),
+	TP_PROTO(unsigned long vcpu_id, int level, u64 cval),
+	TP_ARGS(vcpu_id, level, cval),
 
 	TP_STRUCT__entry(
 		__field(	unsigned long,	vcpu_id)
 		__field(	int,		level)
+		__field(	u64,		cval	)
 	),
 
 	TP_fast_assign(
 		__entry->vcpu_id	= vcpu_id;
 		__entry->level		= level;
+		__entry->cval		= cval;
 	),
 
-	TP_printk("VCPU: %ld, level %d",
-		 __entry->vcpu_id, __entry->level)
+	TP_printk("VCPU: %ld, level %d, cval %llx",
+		 __entry->vcpu_id, __entry->level, __entry->cval)
 );
 #endif /* _TRACE_KVM_H */
 
