@@ -243,7 +243,8 @@ static pv_handle_fn kvm_get_pv_handler(struct kvm_vcpu *vcpu)
 	u8 imm_instr = imm >> PV_INSTR_SHIFT;
 
 	if (imm_instr >= ARRAY_SIZE(pv_handlers) || !pv_handlers[imm_instr]) {
-		kvm_err("Unknown PV encoding: imm: %#04x\n", imm);
+		kvm_err("Unknown PV encoding: imm: %#04x at %lx\n", imm, *vcpu_pc(vcpu));
+		BUG();
 		return NULL;
 	}
 
