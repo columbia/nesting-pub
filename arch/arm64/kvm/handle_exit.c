@@ -237,6 +237,7 @@ int kvm_handle_eret(struct kvm_vcpu *vcpu, struct kvm_run *run)
 	if (!vcpu_vhe_host(vcpu)) {
 		trace_eret_l2vm(vcpu, *vcpu_pc(vcpu));
 		kvm_vtimer_vcpu_put(vcpu, vcpu_vtimer_el2(vcpu));
+		kvm_timer_cancel(vcpu_vtimer(vcpu));
 		kvm_vtimer_vcpu_load(vcpu, vcpu_vtimer(vcpu));
 	}
 
