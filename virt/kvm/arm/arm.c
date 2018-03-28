@@ -544,20 +544,20 @@ static void enable_cc(void *dummy)
 	unsigned long tmp;
 	asm volatile(
 		     "mrs %0, PMCR_EL0\n"
-		     "orr %0, %0, #1\n"
-		     "orr %0, %0, #(1 << 2)\n"
-		     "bic %0, %0, #(1 << 3)\n"
+		     "orr %0, %0, #1\n" 	/* Enable counters */
+		     "orr %0, %0, #(1 << 2)\n"	/* Cycle counter reset */
+		     "bic %0, %0, #(1 << 3)\n"	/*  PMCCNTR_EL0 counts every clock cycle */
 		     "msr PMCR_EL0, %0\n"
-		     "mov %0, #0b11111\n"
-		     "msr PMSELR_EL0, %0\n"
+		     "mov %0, #0b11111\n"	/* selects the cycle counter and */
+		     "msr PMSELR_EL0, %0\n"	/* redirects PMXEVTYPER_EL0 to PMCCFILTR_EL0 */
 		     "isb \n"
 		     "mrs %0, PMXEVTYPER_EL0\n"
-		     "orr %0, %0, #(1 << 27)\n"
-		     "bic %0, %0, #(3 << 30)\n"
-		     "bic %0, %0, #(3 << 28)\n"
+		     "orr %0, %0, #(1 << 27)\n" /* Count cycles in EL2 */
+		     "bic %0, %0, #(3 << 30)\n" /* Count cycles in EL1 and EL0 */
+		     "bic %0, %0, #(3 << 28)\n" /* Make it same as P and U to count cycles in EL1 and EL0 */
 		     "msr PMXEVTYPER_EL0, %0\n"
 		     "mrs %0, PMCNTENSET_EL0\n"
-		     "orr %0, %0, #(1 << 31)\n"
+		     "orr %0, %0, #(1 << 31)\n" /* Enable PMCCNTR_EL0 */
 		     "msr PMCNTENSET_EL0, %0\n"
 		     : "=r" (tmp));
 	isb();
