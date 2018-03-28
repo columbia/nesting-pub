@@ -674,6 +674,23 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
 	}
 }
 
+void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+{
+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+
+	/* We are relying on the phys virt timer irqs in this case */
+	if (!vcpu_vhe_host(vcpu))
+		return;
+
+	if (unlikely(!timer->enabled))
+		return;
+
+	/* When we are emulating vtimer, register states are up-to-date */
+	if (kvm_timer_should_fire(vcpu, vtimer) != vtimer->irq.level)
+		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
+}
+
 int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
