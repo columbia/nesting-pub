@@ -354,6 +354,7 @@ void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
 	} else
 		sync_special_regs(vcpu);
 
+	vgic_propagate_eoi(vcpu);
 	vgic_v2_restore_shadow_state(vcpu);
 }
 

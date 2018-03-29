@@ -18,6 +18,10 @@
 /* FIXME: This should come from DT */
 #define KVM_VGIC_V2_GICH_BASE          0x08030000
 #define KVM_VGIC_V2_GICH_SIZE          0x2000
+static inline u32 *vcpu_prev_shadow_state(struct kvm_vcpu *vcpu)
+{
+	return vcpu->arch.vgic_cpu.prev_shadow_vgic_v2_lr;
+}
 
 static inline struct vgic_v2_cpu_if *vcpu_nested_if(struct kvm_vcpu *vcpu)
 {
@@ -247,6 +251,7 @@ static void vgic_v2_create_shadow_lr(struct kvm_vcpu *vcpu)
 	int i;
 	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
 	struct vgic_v2_cpu_if *s_cpu_if = vcpu_shadow_if(vcpu);
+	u32 *prev_shadow_state = vcpu_prev_shadow_state(vcpu);
 	struct vgic_irq *irq;
 
 	int nr_lr = kvm_vgic_global_state.nr_lr;
@@ -255,6 +260,7 @@ static void vgic_v2_create_shadow_lr(struct kvm_vcpu *vcpu)
 		u32 lr = cpu_if->vgic_lr[i];
 		int l1_irq;
 
+		prev_shadow_state[i] = 0;
 		if (!(lr & GICH_LR_HW))
 			goto next;
 
@@ -278,9 +284,70 @@ static void vgic_v2_create_shadow_lr(struct kvm_vcpu *vcpu)
 
 next:
 		s_cpu_if->vgic_lr[i] = lr;
+		prev_shadow_state[i] = lr;
 	}
 }
 
+/*
+ * If a nested OS deactivated a virtual interrupt, which is associated with
+ * a hardware interrupt (i.e. HW bit set by the guest hypervisor), then
+ * we reflect this to the virtual distributor for the guest hypervisor.
+ * This is equivalent to the interrupt state change made to the physical
+ * distributor by hardware in the non-nesting case.
+ */
+static void __vgic_propagate_eoi(struct kvm_vcpu *vcpu, u32 val)
+{
+	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+	int nr_lr = kvm_vgic_global_state.nr_lr;
+	int i;
+	int phys_id, virt_id;
+
+	phys_id = (val & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT;
+
+	/*
+	 * We change LRs for the guest hypervisor, since LR states are not
+	 * synced back to the AP list at this point.
+	 */
+	for (i = 0; i < nr_lr; i++) {
+		virt_id = cpu_if->vgic_lr[i] & GICH_LR_VIRTUALID;
+		if (virt_id == phys_id) {
+			cpu_if->vgic_lr[i] &= ~GICH_LR_ACTIVE_BIT;
+			return;
+		}
+	}
+}
+
+/* Assume that shadow_if has the latest lr states and cpu_if has
+ * the original phys_id */
+void vgic_propagate_eoi(struct kvm_vcpu *vcpu)
+{
+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
+	struct vgic_v2_cpu_if *s_cpu_if = vcpu_shadow_if(vcpu);
+	int nr_lr = kvm_vgic_global_state.nr_lr;
+	int i;
+	int lr;
+	bool was_active;
+	bool now_active;
+	u32 *prev_shadow_state = vcpu_prev_shadow_state(vcpu);
+
+	/* Not using shadow state: Nothing to do... */
+	if (vgic_cpu->hw_v2_cpu_if == &vgic_cpu->vgic_v2)
+		return;
+
+	for (i = 0; i < nr_lr; i++) {
+		lr = s_cpu_if->vgic_lr[i];
+		lr &= ~GICH_LR_PHYSID_CPUID;
+		lr |= cpu_if->vgic_lr[i] & GICH_LR_PHYSID_CPUID;
+
+		if (GICH_LR_HW & lr) {
+			was_active =  (GICH_LR_ACTIVE_BIT & prev_shadow_state[i])? true : false;
+			now_active =  (GICH_LR_ACTIVE_BIT & lr)? true : false;
+			if (was_active && !now_active)
+				__vgic_propagate_eoi(vcpu, lr);
+		}
+	}
+}
 /*
  * Change the shadow HWIRQ field back to the virtual value before copying over
  * the entire shadow struct to the nested state.

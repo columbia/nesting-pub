@@ -304,6 +304,11 @@ struct vgic_cpu {
 	};
 
 	union {
+		u32	prev_shadow_vgic_v2_lr[VGIC_V2_MAX_LRS];
+		u64	prev_shadow_vgic_v3_lr[VGIC_V3_MAX_LRS];
+	};
+
+	union {
 		struct vgic_v2_cpu_if	*hw_v2_cpu_if;
 		struct vgic_v3_cpu_if	*hw_v3_cpu_if;
 	};
@@ -368,6 +373,7 @@ void kvm_vgic_put(struct kvm_vcpu *vcpu);
 void vgic_v2_setup_shadow_state(struct kvm_vcpu *vcpu);
 void vgic_v2_restore_shadow_state(struct kvm_vcpu *vcpu);
 void vgic_handle_nested_maint_irq(struct kvm_vcpu *vcpu);
+void vgic_propagate_eoi(struct kvm_vcpu *vcpu);
 
 #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
 #define vgic_initialized(k)	((k)->arch.vgic.initialized)
