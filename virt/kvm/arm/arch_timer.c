@@ -224,30 +224,47 @@ static enum hrtimer_restart kvm_bg_timer_expire(struct hrtimer *hrt)
 	return HRTIMER_NORESTART;
 }
 
-static enum hrtimer_restart kvm_phys_timer_expire(struct hrtimer *hrt)
+static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt,
+					     struct kvm_vcpu *vcpu,
+					     struct arch_timer_context *timer_ctx)
 {
-	struct arch_timer_context *ptimer;
-	struct arch_timer_cpu *timer;
-	struct kvm_vcpu *vcpu;
 	u64 ns;
-
-	timer = container_of(hrt, struct arch_timer_cpu, phys_timer);
-	vcpu = container_of(timer, struct kvm_vcpu, arch.timer_cpu);
-	ptimer = vcpu_ptimer(vcpu);
 
 	/*
 	 * Check that the timer has really expired from the guest's
 	 * PoV (NTP on the host may have forced it to expire
 	 * early). If not ready, schedule for a later time.
 	 */
-	ns = kvm_timer_compute_delta(vcpu, ptimer);
+	ns = kvm_timer_compute_delta(vcpu, timer_ctx);
 	if (unlikely(ns)) {
 		hrtimer_forward_now(hrt, ns_to_ktime(ns));
 		return HRTIMER_RESTART;
 	}
 
-	kvm_timer_update_irq(vcpu, true, ptimer);
+	kvm_timer_update_irq(vcpu, true, timer_ctx);
 	return HRTIMER_NORESTART;
+}
+
+static enum hrtimer_restart kvm_phys_timer_expire(struct hrtimer *hrt)
+{
+	struct arch_timer_context *ptimer;
+	struct kvm_vcpu *vcpu;
+
+	ptimer = container_of(hrt, struct arch_timer_context, soft_timer);
+	vcpu = container_of(ptimer, struct kvm_vcpu, arch.timer_cpu.ptimer);
+
+	return kvm_timer_expire(hrt, vcpu, ptimer);
+}
+
+static enum hrtimer_restart kvm_virt_timer_expire(struct hrtimer *hrt)
+{
+	struct arch_timer_context *vtimer;
+	struct kvm_vcpu *vcpu;
+
+	vtimer = container_of(hrt, struct arch_timer_context, soft_timer);
+	vcpu = container_of(vtimer, struct kvm_vcpu, arch.timer_cpu.vtimer);
+
+	return kvm_timer_expire(hrt, vcpu, vtimer);
 }
 
 static bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
@@ -336,25 +353,30 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
  * Check if there was a change in the emulated phys timer state, and
  * schedule/cancel a soft timer for the emulated phys timer.
  */
-static void phys_timer_emulate(struct kvm_vcpu *vcpu)
+void kvm_timer_emulate(struct kvm_vcpu *vcpu,
+		       struct arch_timer_context *timer_ctx)
 {
-	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-
-	if (kvm_timer_should_fire(vcpu, ptimer) != ptimer->irq.level)
-		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
+	if (kvm_timer_should_fire(vcpu, timer_ctx) != timer_ctx->irq.level)
+		kvm_timer_update_irq(vcpu, !timer_ctx->irq.level, timer_ctx);
 
 	/*
 	 * If the timer can fire now we have just raised the IRQ line and we
 	 * don't need to have a soft timer scheduled for the future.  If the
 	 * timer cannot fire at all, then we also don't need a soft timer.
 	 */
-	if (kvm_timer_should_fire(vcpu, ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
-		soft_timer_cancel(&timer->phys_timer, NULL);
+	if (kvm_timer_should_fire(vcpu, timer_ctx) ||
+	    !kvm_timer_irq_can_fire(timer_ctx)) {
+		soft_timer_cancel(&timer_ctx->soft_timer, NULL);
 		return;
 	}
 
-	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(vcpu, ptimer));
+	soft_timer_start(&timer_ctx->soft_timer,
+			 kvm_timer_compute_delta(vcpu, timer_ctx));
+}
+
+void kvm_timer_cancel(struct arch_timer_context *timer_ctx)
+{
+	soft_timer_cancel(&timer_ctx->soft_timer, NULL);
 }
 
 /*
@@ -373,7 +395,7 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
 	if (kvm_timer_should_fire(vcpu, vtimer) != vtimer->irq.level)
 		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
 
-	phys_timer_emulate(vcpu);
+	kvm_timer_emulate(vcpu, vcpu_ptimer(vcpu));
 }
 
 static void vtimer_save_state(struct kvm_vcpu *vcpu,
@@ -549,7 +571,7 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
 	else
 		kvm_vtimer_vcpu_load(vcpu, vcpu_vtimer_el2(vcpu));
 
-	phys_timer_emulate(vcpu);
+	kvm_timer_emulate(vcpu, vcpu_ptimer(vcpu));
 }
 
 bool kvm_timer_should_notify_user(struct kvm_vcpu *vcpu)
@@ -591,6 +613,7 @@ void kvm_vtimer_vcpu_put(struct kvm_vcpu *vcpu,
 void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
 
 	if (unlikely(!timer->enabled))
 		return;
@@ -609,7 +632,7 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
 	 * In any case, we re-schedule the hrtimer for the physical timer when
 	 * coming back to the VCPU thread in kvm_timer_vcpu_load().
 	 */
-	soft_timer_cancel(&timer->phys_timer, NULL);
+	soft_timer_cancel(&ptimer->soft_timer, NULL);
 }
 
 static void unmask_vtimer_irq(struct kvm_vcpu *vcpu)
@@ -653,6 +676,9 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 
+	if (vcpu_vhe_host(vcpu))
+		kvm_timer_cancel(vtimer);
+
 	/*
 	 * If we entered the guest with the vtimer output asserted we have to
 	 * check if the guest has modified the timer so that we should lower
@@ -689,6 +715,8 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
 	/* When we are emulating vtimer, register states are up-to-date */
 	if (kvm_timer_should_fire(vcpu, vtimer) != vtimer->irq.level)
 		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
+
+	kvm_timer_emulate(vcpu, vtimer);
 }
 
 int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
@@ -747,8 +775,11 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
 	hrtimer_init(&timer->bg_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
 	timer->bg_timer.function = kvm_bg_timer_expire;
 
-	hrtimer_init(&timer->phys_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
-	timer->phys_timer.function = kvm_phys_timer_expire;
+	hrtimer_init(&ptimer->soft_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+	ptimer->soft_timer.function = kvm_phys_timer_expire;
+
+	hrtimer_init(&vtimer->soft_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+	vtimer->soft_timer.function = kvm_virt_timer_expire;
 
 	vtimer->irq.irq = default_vtimer_irq.irq;
 	ptimer->irq.irq = default_ptimer_irq.irq;
@@ -898,9 +929,10 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
 
 	soft_timer_cancel(&timer->bg_timer, &timer->expired);
-	soft_timer_cancel(&timer->phys_timer, NULL);
+	soft_timer_cancel(&ptimer->soft_timer, NULL);
 	kvm_vgic_unmap_phys_irq(vcpu, vtimer->irq.irq);
 }
 
