@@ -676,6 +676,9 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 
+	if (vcpu_vhe_host(vcpu))
+		kvm_timer_cancel(vtimer);
+
 	/*
 	 * If we entered the guest with the vtimer output asserted we have to
 	 * check if the guest has modified the timer so that we should lower
@@ -712,6 +715,8 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
 	/* When we are emulating vtimer, register states are up-to-date */
 	if (kvm_timer_should_fire(vcpu, vtimer) != vtimer->irq.level)
 		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
+
+	kvm_timer_emulate(vcpu, vtimer);
 }
 
 int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
