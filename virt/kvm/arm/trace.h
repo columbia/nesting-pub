@@ -277,7 +277,7 @@ TRACE_EVENT(kvm_ptimer_update_irq,
 		__entry->cval		= cval;
 	),
 
-	TP_printk("ptimer VCPU: %ld, IRQ %d, level %d, cval %llx",
+	TP_printk("ptimer VCPU: %ld, IRQ %d, level %d, cval 0x%llx",
 		  __entry->vcpu_id, __entry->irq, __entry->level, __entry->cval)
 );
 
@@ -302,7 +302,7 @@ TRACE_EVENT(kvm_vtimer_update_irq,
 		__entry->cval		= cval;
 	),
 
-	TP_printk("vtimer VCPU: %ld, IRQ %d, level %d, cval %llx",
+	TP_printk("vtimer VCPU: %ld, IRQ %d, level %d, cval 0x%llx",
 		  __entry->vcpu_id, __entry->irq, __entry->level, __entry->cval)
 );
 
@@ -325,7 +325,7 @@ TRACE_EVENT(kvm_vtimer_handler,
 		__entry->cval		= cval;
 	),
 
-	TP_printk("VCPU: %ld, level %d, cval %llx",
+	TP_printk("VCPU: %ld, level %d, cval 0x%llx",
 		 __entry->vcpu_id, __entry->level, __entry->cval)
 );
 #endif /* _TRACE_KVM_H */
