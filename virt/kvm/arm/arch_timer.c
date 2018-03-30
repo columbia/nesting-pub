@@ -396,7 +396,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
 		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
 
 	kvm_timer_emulate(vcpu, vcpu_ptimer(vcpu));
-	kvm_timer_emulate(vcpu, vcpu_vtimer(vcpu));
 }
 
 static void vtimer_save_state(struct kvm_vcpu *vcpu,
@@ -569,10 +568,8 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
 
 	if (!vcpu_vhe_host(vcpu))
 		kvm_vtimer_vcpu_load(vcpu, vcpu_vtimer(vcpu));
-	else {
+	else
 		kvm_vtimer_vcpu_load(vcpu, vcpu_vtimer_el2(vcpu));
-		kvm_timer_emulate(vcpu, vcpu_vtimer(vcpu));
-	}
 
 	kvm_timer_emulate(vcpu, vcpu_ptimer(vcpu));
 }

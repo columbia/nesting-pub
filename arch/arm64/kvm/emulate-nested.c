@@ -79,7 +79,6 @@ static int kvm_inject_nested(struct kvm_vcpu *vcpu, u64 esr_el2,
 	if (!prev_vhe_host && vcpu_vhe_host(vcpu)) {
 		kvm_vtimer_vcpu_put(vcpu, vcpu_vtimer(vcpu));
 		kvm_vtimer_vcpu_load(vcpu, vcpu_vtimer_el2(vcpu));
-		kvm_timer_emulate(vcpu, vcpu_vtimer(vcpu));
 	}
 
 	return ret;

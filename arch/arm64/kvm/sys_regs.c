@@ -1259,7 +1259,6 @@ void handle_hcr_write(struct kvm_vcpu *vcpu,
 	if (!(prev & HCR_E2H) && (new & HCR_E2H)) {
 		kvm_vtimer_vcpu_put(vcpu, vcpu_vtimer(vcpu));
 		kvm_vtimer_vcpu_load(vcpu, vcpu_vtimer_el2(vcpu));
-		kvm_timer_emulate(vcpu, vcpu_vtimer(vcpu));
 	}
 }
 
