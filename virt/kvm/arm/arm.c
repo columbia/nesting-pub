@@ -529,9 +529,17 @@ static void update_vttbr(struct kvm *kvm, struct kvm_s2_vmid *vmid)
 	kvm_next_vmid++;
 	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
 
-	new_vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
-	kvm_for_each_vcpu(i, vcpu, kvm) {
-		vcpu->arch.hw_vttbr = new_vttbr;
+	/*
+	 * When we support nested virtualization, setting hw_vttbr here is
+	 * neither necessary - we always set it just before entering a VM - nor
+	 * correct. For example,  if the hw_vttbr for other vcpu is overwritten
+	 * after the vcpu's hw_vttbr set in setup_s2_mmu() and  before writing
+	 * it to the physical vttbr_el2, then it's going to be messed up.
+	 */
+	if (!nested_virt_in_use(kvm->vcpus[0])) {
+		new_vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
+		kvm_for_each_vcpu(i, vcpu, kvm)
+			vcpu->arch.hw_vttbr = new_vttbr;
 	}
 
 	spin_unlock(&kvm_vmid_lock);
